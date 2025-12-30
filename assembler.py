@@ -79,8 +79,8 @@ def create_text_overlay(text: str, duration: float, video_size: tuple):
         text_align='center'
     )
 
-    # Position at bottom of screen and set duration
-    txt_clip = txt_clip.with_position(('center', video_size[1] - 200))
+    # Position at bottom of screen (with more room) and set duration
+    txt_clip = txt_clip.with_position(('center', video_size[1] - 350))
     txt_clip = txt_clip.with_duration(duration)
 
     # Add fade in effect (first 1.5 seconds)
@@ -122,8 +122,8 @@ def assemble_video(
     voice_audio = AudioFileClip(voice_path)
     voice_duration = voice_audio.duration
 
-    # Add padding to video duration (2-3 seconds after voiceover)
-    video_duration = voice_duration + 2.5
+    # Add padding to video duration (5 seconds after voiceover for longer videos)
+    video_duration = voice_duration + 5.0
 
     # Create the image clip with Ken Burns effect
     video_clip = create_ken_burns_clip(image_path, video_duration)
