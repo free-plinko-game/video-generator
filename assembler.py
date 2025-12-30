@@ -3,7 +3,7 @@
 import os
 from moviepy import (
     ImageClip, AudioFileClip, CompositeVideoClip, CompositeAudioClip,
-    TextClip, concatenate_audioclips
+    TextClip, concatenate_audioclips, vfx
 )
 import numpy as np
 
@@ -84,7 +84,7 @@ def create_text_overlay(text: str, duration: float, video_size: tuple):
     txt_clip = txt_clip.with_duration(duration)
 
     # Add fade in effect (first 1.5 seconds)
-    txt_clip = txt_clip.with_effects([lambda clip: clip.crossfadein(1.5)])
+    txt_clip = txt_clip.with_effects([vfx.CrossFadeIn(1.5)])
 
     return txt_clip
 
