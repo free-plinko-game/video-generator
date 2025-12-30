@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Liminal Space Video Generator{% endblock %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-12 text-center">
+        <h1 class="display-6 mb-3" style="font-weight: 300; letter-spacing: 3px;">LIMINAL SPACES</h1>
+        <p class="liminal-quote">"You've been here before. You just don't remember when."</p>
+
+        <div id="generate-section" class="mt-4">
+            <button id="generate-btn" class="btn btn-liminal btn-lg">
+                <i class="bi bi-play-fill me-2"></i>Generate New Video
+            </button>
+        </div>
+
+        <div id="progress-section" class="mt-4 d-none">
+            <div class="card mx-auto" style="max-width: 500px;">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">
+                        <span class="status-indicator status-generating"></span>
+                        <span id="status-message">Starting...</span>
+                    </h5>
+                    <div class="progress mb-3">
+                        <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small id="progress-text" class="text-muted">0%</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h4 class="mb-4" style="font-weight: 300; letter-spacing: 2px;">RECENT VIDEOS</h4>
+
+{% if videos %}
+<div class="row g-4" id="videos-grid">
+    {% for video in videos %}
+    <div class="col-6 col-md-4 col-lg-3">
+        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="text-decoration-none">
+            <div class="card h-100">
+                {% if video.image_path %}
+                <img src="{{ url_for('static', filename='thumbnails/' ~ video.id ~ '.png') }}"
+                     class="card-img-top video-thumbnail"
+                     alt="Video {{ video.id }}"
+                     onerror="this.parentElement.innerHTML='<div class=\'video-thumbnail-placeholder\'><i class=\'bi bi-film fs-1 text-muted\'></i></div>'">
+                {% else %}
+                <div class="video-thumbnail-placeholder">
+                    <i class="bi bi-film fs-1 text-muted"></i>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <p class="card-text small mb-1">{{ video.location or 'Generating...' }}</p>
+                    <small class="text-muted">{{ video.time_of_day or '' }}</small>
+                    <div class="mt-2">
+                        <span class="badge bg-{{ video.status|status_badge }}">{{ video.status }}</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-collection fs-1 text-muted mb-3 d-block"></i>
+    <p class="text-muted">No videos yet. Generate your first liminal space video.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentVideoId = null;
+let pollInterval = null;
+
+document.getElementById('generate-btn').addEventListener('click', function() {
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
+
+    fetch('{{ url_for("generate") }}', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.video_id) {
+            currentVideoId = data.video_id;
+            document.getElementById('generate-section').classList.add('d-none');
+            document.getElementById('progress-section').classList.remove('d-none');
+            startPolling();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill me-2"></i>Generate New Video';
+    });
+});
+
+function startPolling() {
+    pollInterval = setInterval(checkStatus, 1000);
+}
+
+function checkStatus() {
+    if (!currentVideoId) return;
+
+    fetch(`/status/${currentVideoId}`)
+    .then(response => response.json())
+    .then(data => {
+        updateProgress(data);
+
+        if (data.status === 'complete' || data.status === 'failed') {
+            clearInterval(pollInterval);
+            setTimeout(() => {
+                window.location.href = `/videos/${currentVideoId}`;
+            }, 1500);
+        }
+    })
+    .catch(error => {
+        console.error('Error checking status:', error);
+    });
+}
+
+function updateProgress(data) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const statusMessage = document.getElementById('status-message');
+
+    const progress = Math.max(0, data.progress);
+    progressBar.style.width = progress + '%';
+    progressText.textContent = progress + '%';
+    statusMessage.textContent = data.message;
+
+    if (data.status === 'complete') {
+        progressBar.classList.add('bg-success');
+    } else if (data.status === 'failed') {
+        progressBar.classList.add('bg-danger');
+    }
+}
+</script>
+{% endblock %}

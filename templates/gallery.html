@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Gallery - Liminal Space Video Generator{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 style="font-weight: 300; letter-spacing: 2px;">ALL VIDEOS</h2>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-liminal">
+        <i class="bi bi-plus-lg me-2"></i>New Video
+    </a>
+</div>
+
+{% if videos %}
+<div class="row g-4">
+    {% for video in videos %}
+    <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+        <a href="{{ url_for('video_detail', video_id=video.id) }}" class="text-decoration-none">
+            <div class="card h-100">
+                {% if video.image_path %}
+                <img src="{{ url_for('static', filename='thumbnails/' ~ video.id ~ '.png') }}"
+                     class="card-img-top video-thumbnail"
+                     alt="Video {{ video.id }}"
+                     onerror="this.parentElement.innerHTML='<div class=\'video-thumbnail-placeholder\'><i class=\'bi bi-film fs-1 text-muted\'></i></div>'">
+                {% else %}
+                <div class="video-thumbnail-placeholder">
+                    <i class="bi bi-film fs-1 text-muted"></i>
+                </div>
+                {% endif %}
+                <div class="card-body p-2">
+                    <p class="card-text small mb-1 text-truncate">{{ video.location or 'Unknown' }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">{{ video.time_of_day or '' }}</small>
+                        <span class="badge bg-{{ video.status|status_badge }} badge-sm">{{ video.status }}</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-collection fs-1 text-muted mb-3 d-block"></i>
+    <p class="text-muted mb-4">No videos generated yet.</p>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-liminal">
+        <i class="bi bi-play-fill me-2"></i>Generate Your First Video
+    </a>
+</div>
+{% endif %}
+{% endblock %}

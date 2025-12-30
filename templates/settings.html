@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Liminal Space Video Generator{% endblock %}
+
+{% block content %}
+<h2 class="mb-4" style="font-weight: 300; letter-spacing: 2px;">SETTINGS</h2>
+
+<div class="row">
+    <div class="col-lg-8">
+        <form method="post">
+            <!-- API Keys -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-key me-2"></i>API Keys
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="anthropic_key" class="form-label">Anthropic API Key</label>
+                        <input type="password" class="form-control" id="anthropic_key" name="anthropic_key"
+                               value="{{ anthropic_key }}" placeholder="sk-ant-...">
+                        <div class="form-text">
+                            Get your API key from <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label for="hf_token" class="form-label">Hugging Face API Token</label>
+                        <input type="password" class="form-control" id="hf_token" name="hf_token"
+                               value="{{ hf_token }}" placeholder="hf_...">
+                        <div class="form-text">
+                            Get your token from <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-mic me-2"></i>Voice Settings
+                </div>
+                <div class="card-body">
+                    <div class="mb-0">
+                        <label for="default_voice" class="form-label">Default Voice</label>
+                        <select class="form-select" id="default_voice" name="default_voice">
+                            {% for voice_id, voice_name in available_voices %}
+                            <option value="{{ voice_id }}" {% if voice_id == default_voice %}selected{% endif %}>
+                                {{ voice_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">
+                            The voice used for whispered narration in videos.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-liminal">
+                <i class="bi bi-check-lg me-2"></i>Save Settings
+            </button>
+        </form>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Music Files Info -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-music-note-beamed me-2"></i>Music Library
+            </div>
+            <div class="card-body">
+                {% if music_files %}
+                <p class="small text-muted mb-2">Available music loops:</p>
+                <ul class="list-unstyled small mb-0">
+                    {% for file in music_files %}
+                    <li class="mb-1">
+                        <i class="bi bi-file-earmark-music me-1 text-muted"></i>
+                        {{ file }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-2">No music files found.</p>
+                <p class="small mb-0">
+                    Add ambient/drone music loops to:<br>
+                    <code>assets/music_loops/</code>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- System Info -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>System Info
+            </div>
+            <div class="card-body small">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Anthropic API</span>
+                    <span class="badge {{ 'bg-success' if anthropic_key else 'bg-danger' }}">
+                        {{ 'Configured' if anthropic_key else 'Not Set' }}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Hugging Face API</span>
+                    <span class="badge {{ 'bg-success' if hf_token else 'bg-danger' }}">
+                        {{ 'Configured' if hf_token else 'Not Set' }}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Music Files</span>
+                    <span>{{ music_files|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

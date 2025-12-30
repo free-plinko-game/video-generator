@@ -1,0 +1,234 @@
+"""Flask web application for Liminal Space Video Generator."""
+
+import os
+import threading
+from flask import (
+    Flask, render_template, request, jsonify,
+    redirect, url_for, send_file, flash
+)
+
+import config
+import db
+from orchestrator import generate_video, regenerate_video, get_status, VideoGenerationError
+from voice_generator import get_available_voices
+from music_handler import list_music_files
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+
+# Store active generation threads
+active_generations = {}
+
+
+def run_generation(video_id: int, voice: str = None):
+    """Background thread function for video generation."""
+    try:
+        generate_video(video_id, voice)
+    except VideoGenerationError:
+        pass  # Error is already logged to database
+    finally:
+        if video_id in active_generations:
+            del active_generations[video_id]
+
+
+def run_regeneration(original_id: int, voice: str = None):
+    """Background thread function for video regeneration."""
+    try:
+        regenerate_video(original_id, voice)
+    except VideoGenerationError:
+        pass
+
+
+@app.route('/')
+def dashboard():
+    """Dashboard with generate button, progress, and recent videos."""
+    recent_videos = db.get_recent_videos(12)
+    return render_template('dashboard.html', videos=recent_videos)
+
+
+@app.route('/generate', methods=['POST'])
+def generate():
+    """Trigger new video generation."""
+    # Check if API keys are configured
+    if not config.ANTHROPIC_API_KEY:
+        flash('Please configure your Anthropic API key in Settings', 'error')
+        return redirect(url_for('settings'))
+
+    if not config.HF_API_TOKEN:
+        flash('Please configure your Hugging Face API token in Settings', 'error')
+        return redirect(url_for('settings'))
+
+    # Get voice preference
+    voice = request.form.get('voice', config.DEFAULT_VOICE)
+
+    # Create video record
+    video_id = db.create_video()
+
+    # Start generation in background thread
+    thread = threading.Thread(target=run_generation, args=(video_id, voice))
+    thread.daemon = True
+    thread.start()
+    active_generations[video_id] = thread
+
+    # Return JSON with video ID for status polling
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'video_id': video_id, 'status': 'started'})
+
+    # Redirect to dashboard for non-AJAX requests
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/status/<int:video_id>')
+def status(video_id):
+    """Return JSON with generation progress."""
+    status_info = get_status(video_id)
+    return jsonify(status_info)
+
+
+@app.route('/videos')
+def gallery():
+    """Gallery of all generated videos."""
+    videos = db.get_all_videos()
+    return render_template('gallery.html', videos=videos)
+
+
+@app.route('/videos/<int:video_id>')
+def video_detail(video_id):
+    """Single video detail page."""
+    video = db.get_video(video_id)
+    if not video:
+        flash('Video not found', 'error')
+        return redirect(url_for('gallery'))
+
+    return render_template('video_detail.html', video=video)
+
+
+@app.route('/videos/<int:video_id>/download')
+def download_video(video_id):
+    """Download MP4 file."""
+    video = db.get_video(video_id)
+    if not video or not video.get('output_path'):
+        flash('Video file not found', 'error')
+        return redirect(url_for('gallery'))
+
+    if not os.path.exists(video['output_path']):
+        flash('Video file not found on disk', 'error')
+        return redirect(url_for('video_detail', video_id=video_id))
+
+    return send_file(
+        video['output_path'],
+        mimetype='video/mp4',
+        as_attachment=True,
+        download_name=f"liminal_{video_id}.mp4"
+    )
+
+
+@app.route('/videos/<int:video_id>/regenerate', methods=['POST'])
+def regenerate(video_id):
+    """Regenerate video with same theme."""
+    original = db.get_video(video_id)
+    if not original:
+        flash('Original video not found', 'error')
+        return redirect(url_for('gallery'))
+
+    voice = request.form.get('voice', config.DEFAULT_VOICE)
+
+    # Start regeneration in background
+    thread = threading.Thread(target=run_regeneration, args=(video_id, voice))
+    thread.daemon = True
+    thread.start()
+
+    flash('Regeneration started! Check the dashboard for progress.', 'success')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    """API keys and preferences settings."""
+    if request.method == 'POST':
+        # Update environment variables (in-memory only)
+        anthropic_key = request.form.get('anthropic_key', '').strip()
+        hf_token = request.form.get('hf_token', '').strip()
+        default_voice = request.form.get('default_voice', config.DEFAULT_VOICE)
+
+        if anthropic_key:
+            config.ANTHROPIC_API_KEY = anthropic_key
+            os.environ['ANTHROPIC_API_KEY'] = anthropic_key
+
+        if hf_token:
+            config.HF_API_TOKEN = hf_token
+            os.environ['HF_API_TOKEN'] = hf_token
+
+        config.DEFAULT_VOICE = default_voice
+
+        # Save to .env file for persistence
+        env_path = os.path.join(config.BASE_DIR, '.env')
+        env_content = f"""ANTHROPIC_API_KEY={config.ANTHROPIC_API_KEY}
+HF_API_TOKEN={config.HF_API_TOKEN}
+DEFAULT_VOICE={config.DEFAULT_VOICE}
+"""
+        with open(env_path, 'w') as f:
+            f.write(env_content)
+
+        flash('Settings saved successfully!', 'success')
+        return redirect(url_for('settings'))
+
+    return render_template(
+        'settings.html',
+        anthropic_key=config.ANTHROPIC_API_KEY,
+        hf_token=config.HF_API_TOKEN,
+        default_voice=config.DEFAULT_VOICE,
+        available_voices=get_available_voices(),
+        music_files=list_music_files()
+    )
+
+
+@app.route('/api/videos')
+def api_videos():
+    """API endpoint to get all videos as JSON."""
+    videos = db.get_all_videos()
+    return jsonify(videos)
+
+
+@app.route('/api/videos/<int:video_id>')
+def api_video(video_id):
+    """API endpoint to get a single video as JSON."""
+    video = db.get_video(video_id)
+    if not video:
+        return jsonify({'error': 'Video not found'}), 404
+    return jsonify(video)
+
+
+@app.template_filter('status_badge')
+def status_badge_filter(status):
+    """Template filter to get bootstrap badge class for status."""
+    badges = {
+        'pending': 'secondary',
+        'generating_theme': 'info',
+        'generating_prompts': 'info',
+        'creating_image': 'info',
+        'creating_voice': 'info',
+        'selecting_music': 'info',
+        'assembling': 'warning',
+        'complete': 'success',
+        'failed': 'danger'
+    }
+    return badges.get(status, 'secondary')
+
+
+@app.template_filter('format_duration')
+def format_duration_filter(seconds):
+    """Template filter to format duration as MM:SS."""
+    if not seconds:
+        return '--:--'
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes}:{secs:02d}"
+
+
+if __name__ == '__main__':
+    # Initialize database
+    db.init_db()
+
+    # Run the app
+    app.run(debug=True, host='0.0.0.0', port=5000)

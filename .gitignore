@@ -1,0 +1,41 @@
+# Environment and secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# Generated content
+outputs/
+temp/
+data/*.db
+
+# Keep directories but not contents
+!outputs/.gitkeep
+!temp/.gitkeep
+!data/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test files
+test_*.png
+test_*.mp3
+test_*.mp4
