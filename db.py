@@ -51,9 +51,40 @@ def init_db():
                 music_path TEXT,
                 output_path TEXT,
                 duration_seconds REAL,
-                error_message TEXT
+                error_message TEXT,
+                youtube_id TEXT,
+                youtube_url TEXT,
+                youtube_status TEXT,
+                youtube_published_at TIMESTAMP,
+                youtube_title TEXT,
+                youtube_description TEXT
             )
         """)
+
+    # Run migrations for existing databases
+    _migrate_db()
+
+
+def _migrate_db():
+    """Add new columns to existing databases."""
+    youtube_columns = [
+        ("youtube_id", "TEXT"),
+        ("youtube_url", "TEXT"),
+        ("youtube_status", "TEXT"),
+        ("youtube_published_at", "TIMESTAMP"),
+        ("youtube_title", "TEXT"),
+        ("youtube_description", "TEXT"),
+    ]
+
+    with get_db() as conn:
+        # Get existing columns
+        cursor = conn.execute("PRAGMA table_info(videos)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+
+        # Add missing columns
+        for col_name, col_type in youtube_columns:
+            if col_name not in existing_columns:
+                conn.execute(f"ALTER TABLE videos ADD COLUMN {col_name} {col_type}")
 
 
 def create_video() -> int:
@@ -135,6 +166,55 @@ def get_completed_videos() -> List[Dict[str, Any]]:
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM videos WHERE status = 'complete' ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+# YouTube-specific functions
+
+def update_youtube_status(video_id: int, status: str) -> None:
+    """Update the YouTube upload status of a video."""
+    update_video(video_id, youtube_status=status)
+
+
+def set_youtube_published(video_id: int, youtube_id: str, youtube_url: str,
+                          title: str, description: str) -> None:
+    """Mark video as published to YouTube."""
+    update_video(
+        video_id,
+        youtube_id=youtube_id,
+        youtube_url=youtube_url,
+        youtube_status='published',
+        youtube_published_at=datetime.now().isoformat(),
+        youtube_title=title,
+        youtube_description=description
+    )
+
+
+def set_youtube_failed(video_id: int) -> None:
+    """Mark YouTube upload as failed."""
+    update_video(video_id, youtube_status='failed')
+
+
+def get_unpublished_videos() -> List[Dict[str, Any]]:
+    """Get completed videos that haven't been published to YouTube."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT * FROM videos
+               WHERE status = 'complete'
+               AND (youtube_status IS NULL OR youtube_status = 'failed')
+               ORDER BY created_at DESC"""
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_published_videos() -> List[Dict[str, Any]]:
+    """Get videos that have been published to YouTube."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT * FROM videos
+               WHERE youtube_status = 'published'
+               ORDER BY youtube_published_at DESC"""
         ).fetchall()
         return [dict(row) for row in rows]
 

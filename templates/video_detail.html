@@ -42,6 +42,15 @@
         border-radius: 4px;
         text-align: center;
     }
+
+    .youtube-card {
+        border-color: #ff0000;
+    }
+
+    .youtube-card .card-header {
+        background-color: rgba(255, 0, 0, 0.1);
+        border-bottom-color: #ff0000;
+    }
 </style>
 {% endblock %}
 
@@ -90,6 +99,105 @@
                 </form>
             </div>
         </div>
+
+        <!-- YouTube Publishing Section -->
+        {% if video.status == 'complete' %}
+        <div class="card youtube-card mt-4">
+            <div class="card-header">
+                <i class="bi bi-youtube me-2"></i>YouTube
+            </div>
+            <div class="card-body">
+                {% if video.youtube_status == 'published' %}
+                    <!-- Already published -->
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-success me-2">Published</span>
+                        <small class="text-muted">{{ video.youtube_published_at }}</small>
+                    </div>
+
+                    {% if video.youtube_title %}
+                    <p class="small mb-2"><strong>Title:</strong> {{ video.youtube_title }}</p>
+                    {% endif %}
+
+                    <div class="d-flex gap-2">
+                        <a href="{{ video.youtube_url }}" target="_blank" class="btn btn-danger btn-sm">
+                            <i class="bi bi-youtube me-1"></i>View on YouTube
+                        </a>
+                    </div>
+
+                {% elif video.youtube_status == 'uploading' %}
+                    <!-- Currently uploading -->
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm text-warning me-2"></div>
+                        <span>Uploading to YouTube...</span>
+                    </div>
+
+                {% elif video.youtube_status == 'failed' %}
+                    <!-- Upload failed -->
+                    <div class="alert alert-danger small mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Upload failed. Please try again.
+                    </div>
+
+                    {% if youtube_authenticated %}
+                    <form action="{{ url_for('publish_to_youtube', video_id=video.id) }}" method="post">
+                        <div class="mb-3">
+                            <label for="youtube_title" class="form-label small">Title</label>
+                            <input type="text" class="form-control form-control-sm" id="youtube_title" name="youtube_title"
+                                   value="{{ video.youtube_title or video.location }}"
+                                   maxlength="100" required>
+                        </div>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-youtube me-2"></i>Retry Upload
+                        </button>
+                    </form>
+                    {% endif %}
+
+                {% else %}
+                    <!-- Not published yet -->
+                    {% if youtube_authenticated %}
+                        <form action="{{ url_for('publish_to_youtube', video_id=video.id) }}" method="post">
+                            <div class="mb-3">
+                                <label for="youtube_title" class="form-label small">Title</label>
+                                <input type="text" class="form-control form-control-sm" id="youtube_title" name="youtube_title"
+                                       value="{{ youtube_metadata.title if youtube_metadata else video.location }}"
+                                       maxlength="100" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="youtube_description" class="form-label small">Description</label>
+                                <textarea class="form-control form-control-sm" id="youtube_description" name="youtube_description"
+                                          rows="3">{{ youtube_metadata.description if youtube_metadata else video.voiceover_script }}</textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="youtube_tags" class="form-label small">Tags (comma-separated)</label>
+                                <input type="text" class="form-control form-control-sm" id="youtube_tags" name="youtube_tags"
+                                       value="{{ youtube_metadata.tags|join(', ') if youtube_metadata else 'liminal, liminalspace, shorts, ambient' }}">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="youtube_privacy" class="form-label small">Privacy</label>
+                                <select class="form-select form-select-sm" id="youtube_privacy" name="youtube_privacy">
+                                    <option value="public">Public</option>
+                                    <option value="unlisted">Unlisted</option>
+                                    <option value="private">Private</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-danger w-100">
+                                <i class="bi bi-youtube me-2"></i>Publish to YouTube
+                            </button>
+                        </form>
+                    {% else %}
+                        <p class="small text-muted mb-3">Connect your YouTube account to publish videos as Shorts.</p>
+                        <a href="{{ url_for('settings') }}" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-gear me-1"></i>Go to Settings
+                        </a>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Metadata Column -->
@@ -99,7 +207,12 @@
                 <h2 class="mb-1" style="font-weight: 300;">{{ video.location or 'Generating...' }}</h2>
                 <p class="text-muted mb-0">{{ video.time_of_day or '' }}</p>
             </div>
-            <span class="badge bg-{{ video.status|status_badge }} fs-6">{{ video.status }}</span>
+            <div class="text-end">
+                <span class="badge bg-{{ video.status|status_badge }} fs-6">{{ video.status }}</span>
+                {% if video.youtube_status == 'published' %}
+                <br><span class="badge bg-danger mt-1"><i class="bi bi-youtube me-1"></i>Published</span>
+                {% endif %}
+            </div>
         </div>
 
         {% if video.voiceover_script %}
@@ -176,17 +289,24 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if video.status not in ['complete', 'failed'] %}
+{% if video.status not in ['complete', 'failed'] or video.youtube_status == 'uploading' %}
 <script>
-// Poll for status updates if video is still generating
+// Poll for status updates if video is still generating or uploading
 const videoId = {{ video.id }};
 let pollInterval = setInterval(() => {
     fetch(`/status/${videoId}`)
     .then(response => response.json())
     .then(data => {
         if (data.status === 'complete' || data.status === 'failed') {
-            clearInterval(pollInterval);
-            location.reload();
+            // Check if still uploading to YouTube
+            fetch(`/api/videos/${videoId}`)
+            .then(response => response.json())
+            .then(videoData => {
+                if (videoData.youtube_status !== 'uploading') {
+                    clearInterval(pollInterval);
+                    location.reload();
+                }
+            });
         }
     });
 }, 2000);

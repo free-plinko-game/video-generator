@@ -60,6 +60,72 @@
                 <i class="bi bi-check-lg me-2"></i>Save Settings
             </button>
         </form>
+
+        <!-- YouTube Settings (separate form) -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-youtube me-2"></i>YouTube Publishing
+            </div>
+            <div class="card-body">
+                {% if youtube_authenticated %}
+                    <!-- Connected state -->
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-success me-2">Connected</span>
+                        {% if youtube_channel %}
+                        <span class="text-muted">{{ youtube_channel.title }}</span>
+                        {% endif %}
+                    </div>
+
+                    {% if youtube_channel %}
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Subscribers</small>
+                            <span>{{ youtube_channel.subscriber_count }}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Videos</small>
+                            <span>{{ youtube_channel.video_count }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <form action="{{ url_for('youtube_disconnect') }}" method="post">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-x-circle me-1"></i>Disconnect
+                        </button>
+                    </form>
+                {% else %}
+                    <!-- Not connected state -->
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-secondary me-2">Not Connected</span>
+                    </div>
+
+                    {% if client_secrets_exists %}
+                        <p class="small text-muted mb-3">
+                            Connect your YouTube account to publish videos directly as Shorts.
+                        </p>
+                        <a href="{{ url_for('youtube_auth') }}" class="btn btn-danger">
+                            <i class="bi bi-youtube me-2"></i>Connect YouTube Account
+                        </a>
+                    {% else %}
+                        <div class="alert alert-warning small mb-3">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Setup Required:</strong> You need to add a <code>client_secrets.json</code> file.
+                        </div>
+                        <p class="small text-muted mb-0">
+                            <strong>Steps to set up:</strong>
+                            <ol class="mt-2 mb-0">
+                                <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                                <li>Create a project and enable YouTube Data API v3</li>
+                                <li>Create OAuth 2.0 credentials (Desktop app type)</li>
+                                <li>Download the JSON and save as <code>client_secrets.json</code> in project root</li>
+                                <li>Refresh this page and click Connect</li>
+                            </ol>
+                        </p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     <div class="col-lg-4">
@@ -107,10 +173,30 @@
                         {{ 'Configured' if hf_token else 'Not Set' }}
                     </span>
                 </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">YouTube</span>
+                    <span class="badge {{ 'bg-success' if youtube_authenticated else 'bg-secondary' }}">
+                        {{ 'Connected' if youtube_authenticated else 'Not Connected' }}
+                    </span>
+                </div>
                 <div class="d-flex justify-content-between">
                     <span class="text-muted">Music Files</span>
                     <span>{{ music_files|length }}</span>
                 </div>
+            </div>
+        </div>
+
+        <!-- YouTube Info -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-info-circle me-2"></i>YouTube Notes
+            </div>
+            <div class="card-body small text-muted">
+                <ul class="mb-0 ps-3">
+                    <li>Videos under 60s become Shorts automatically</li>
+                    <li>YouTube API has daily quota limits (~6 uploads/day on free tier)</li>
+                    <li>First upload may take time while YouTube processes</li>
+                </ul>
             </div>
         </div>
     </div>

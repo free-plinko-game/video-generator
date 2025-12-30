@@ -2,6 +2,10 @@
 .env
 *.env
 
+# Google/YouTube credentials (sensitive!)
+client_secrets.json
+data/youtube_credentials.json
+
 # Python
 __pycache__/
 *.py[cod]

@@ -44,6 +44,17 @@ IMAGE_HEIGHT = 1344
 MAX_RETRIES = 5
 RETRY_DELAY = 10  # seconds
 
+# YouTube API settings
+GOOGLE_CLIENT_SECRETS_FILE = os.path.join(BASE_DIR, "client_secrets.json")
+YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+YOUTUBE_CREDENTIALS_FILE = os.path.join(BASE_DIR, "data/youtube_credentials.json")
+
+# Default YouTube upload settings
+YOUTUBE_DEFAULT_PRIVACY = "public"  # "public", "private", or "unlisted"
+YOUTUBE_DEFAULT_CATEGORY = "22"  # 22 = People & Blogs
+YOUTUBE_DEFAULT_TAGS = ["liminal", "liminalspace", "ambient", "shorts", "aesthetic"]
+YOUTUBE_AUTO_PUBLISH = False  # Auto-publish after video generation
+
 # Create directories on import
 for directory in [OUTPUT_DIR, ASSETS_DIR, MUSIC_DIR, TEMP_DIR, os.path.dirname(DATABASE_PATH)]:
     os.makedirs(directory, exist_ok=True)

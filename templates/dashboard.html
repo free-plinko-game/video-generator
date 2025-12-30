@@ -52,8 +52,21 @@
                 <div class="card-body">
                     <p class="card-text small mb-1">{{ video.location or 'Generating...' }}</p>
                     <small class="text-muted">{{ video.time_of_day or '' }}</small>
-                    <div class="mt-2">
+                    <div class="mt-2 d-flex align-items-center justify-content-between">
                         <span class="badge bg-{{ video.status|status_badge }}">{{ video.status }}</span>
+                        {% if video.youtube_status == 'published' %}
+                        <a href="{{ video.youtube_url }}" target="_blank" class="text-danger" title="View on YouTube">
+                            <i class="bi bi-youtube"></i>
+                        </a>
+                        {% elif video.youtube_status == 'uploading' %}
+                        <span class="text-warning" title="Uploading to YouTube">
+                            <i class="bi bi-youtube"></i>
+                        </span>
+                        {% elif video.youtube_status == 'failed' %}
+                        <span class="text-danger" title="YouTube upload failed">
+                            <i class="bi bi-youtube"></i>
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
