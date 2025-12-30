@@ -1,17 +1,16 @@
 """Video assembler using MoviePy to create the final video."""
 
 import os
-from moviepy.editor import (
+from moviepy import (
     ImageClip, AudioFileClip, CompositeVideoClip, CompositeAudioClip,
     TextClip, concatenate_audioclips
 )
-from moviepy.video.fx.all import resize
 import numpy as np
 
 import config
 
 
-def create_ken_burns_clip(image_path: str, duration: float) -> ImageClip:
+def create_ken_burns_clip(image_path: str, duration: float):
     """
     Create an image clip with Ken Burns effect (slow zoom).
 
@@ -52,10 +51,10 @@ def create_ken_burns_clip(image_path: str, duration: float) -> ImageClip:
 
         return np.array(img)
 
-    return clip.fl(zoom_effect, apply_to=['mask'])
+    return clip.transform(zoom_effect)
 
 
-def create_text_overlay(text: str, duration: float, video_size: tuple) -> TextClip:
+def create_text_overlay(text: str, duration: float, video_size: tuple):
     """
     Create a text overlay for the video.
 
@@ -69,23 +68,23 @@ def create_text_overlay(text: str, duration: float, video_size: tuple) -> TextCl
     """
     # Create text clip
     txt_clip = TextClip(
-        text,
-        fontsize=42,
+        text=text,
+        font_size=42,
         color='white',
-        font='DejaVu-Sans',  # Common font available on most systems
+        font='Arial',
         stroke_color='black',
         stroke_width=1,
         method='caption',
-        size=(video_size[0] - 100, None),  # Width with padding
-        align='center'
+        size=(video_size[0] - 100, None),
+        text_align='center'
     )
 
-    # Position at bottom of screen
-    txt_clip = txt_clip.set_position(('center', video_size[1] - 200))
-    txt_clip = txt_clip.set_duration(duration)
+    # Position at bottom of screen and set duration
+    txt_clip = txt_clip.with_position(('center', video_size[1] - 200))
+    txt_clip = txt_clip.with_duration(duration)
 
     # Add fade in effect (first 1.5 seconds)
-    txt_clip = txt_clip.crossfadein(1.5)
+    txt_clip = txt_clip.with_effects([lambda clip: clip.crossfadein(1.5)])
 
     return txt_clip
 
@@ -128,7 +127,7 @@ def assemble_video(
 
     # Create the image clip with Ken Burns effect
     video_clip = create_ken_burns_clip(image_path, video_duration)
-    video_clip = video_clip.set_fps(24)
+    video_clip = video_clip.with_fps(24)
 
     # Create text overlay
     text_overlay = create_text_overlay(
@@ -147,7 +146,7 @@ def assemble_video(
     audio_tracks = []
 
     # Voice audio (at full volume or specified)
-    voice_audio = voice_audio.volumex(voice_volume)
+    voice_audio = voice_audio.with_volume_scaled(voice_volume)
     audio_tracks.append(voice_audio)
 
     # Music audio (if available)
@@ -161,13 +160,13 @@ def assemble_video(
             music_audio = concatenate_audioclips(music_clips)
 
         # Trim to video length
-        music_audio = music_audio.subclip(0, video_duration)
+        music_audio = music_audio.subclipped(0, video_duration)
 
         # Apply fade out (last 2 seconds)
         music_audio = music_audio.audio_fadeout(2)
 
         # Reduce volume
-        music_audio = music_audio.volumex(music_volume)
+        music_audio = music_audio.with_volume_scaled(music_volume)
 
         audio_tracks.append(music_audio)
 
@@ -178,8 +177,8 @@ def assemble_video(
         final_audio = audio_tracks[0]
 
     # Set audio on video
-    final_video = final_video.set_audio(final_audio)
-    final_video = final_video.set_duration(video_duration)
+    final_video = final_video.with_audio(final_audio)
+    final_video = final_video.with_duration(video_duration)
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
