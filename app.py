@@ -13,6 +13,7 @@ import db
 from orchestrator import generate_video, regenerate_video, get_status, VideoGenerationError
 from voice_generator import get_available_voices
 from music_handler import list_music_files
+from theme_generator import LOCATION_TYPES, TIME_OPTIONS, MOOD_OPTIONS
 from publisher import youtube
 
 app = Flask(__name__)
@@ -22,10 +23,10 @@ app.secret_key = os.urandom(24)
 active_generations = {}
 
 
-def run_generation(video_id: int, voice: str = None):
+def run_generation(video_id: int, options: dict = None):
     """Background thread function for video generation."""
     try:
-        generate_video(video_id, voice)
+        generate_video(video_id, options)
     except VideoGenerationError:
         pass  # Error is already logged to database
     finally:
@@ -75,7 +76,15 @@ def run_youtube_upload(video_id: int, title: str, description: str, tags: list, 
 def dashboard():
     """Dashboard with generate button, progress, and recent videos."""
     recent_videos = db.get_recent_videos(12)
-    return render_template('dashboard.html', videos=recent_videos)
+    return render_template(
+        'dashboard.html',
+        videos=recent_videos,
+        location_types=LOCATION_TYPES,
+        time_options=TIME_OPTIONS,
+        mood_options=MOOD_OPTIONS,
+        voices=get_available_voices(),
+        music_files=list_music_files()
+    )
 
 
 @app.route('/generate', methods=['POST'])
@@ -90,14 +99,30 @@ def generate():
         flash('Please configure your Hugging Face API token in Settings', 'error')
         return redirect(url_for('settings'))
 
-    # Get voice preference
-    voice = request.form.get('voice', config.DEFAULT_VOICE)
+    # Build options from form data
+    options = {
+        'voice': request.form.get('voice', config.DEFAULT_VOICE),
+        'location': request.form.get('location', 'random'),
+        'time': request.form.get('time', 'random'),
+        'mood': request.form.get('mood', 'random'),
+        'duration': request.form.get('duration', 'medium'),
+        'music': request.form.get('music', 'random'),
+    }
+
+    # Optional custom text/theme
+    custom_text = request.form.get('custom_text', '').strip()
+    if custom_text:
+        options['custom_text'] = custom_text
+
+    custom_theme = request.form.get('custom_theme', '').strip()
+    if custom_theme:
+        options['custom_theme'] = custom_theme
 
     # Create video record
     video_id = db.create_video()
 
     # Start generation in background thread
-    thread = threading.Thread(target=run_generation, args=(video_id, voice))
+    thread = threading.Thread(target=run_generation, args=(video_id, options))
     thread.daemon = True
     thread.start()
     active_generations[video_id] = thread

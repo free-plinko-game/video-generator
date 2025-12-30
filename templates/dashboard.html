@@ -9,6 +9,92 @@
         <p class="liminal-quote">"You've been here before. You just don't remember when."</p>
 
         <div id="generate-section" class="mt-4">
+            <!-- Toggle options button -->
+            <button type="button" class="btn btn-outline-secondary btn-sm mb-3" data-bs-toggle="collapse" data-bs-target="#options-panel">
+                <i class="bi bi-sliders me-1"></i>Customize Options
+            </button>
+
+            <!-- Options panel (collapsed by default) -->
+            <div class="collapse mb-4" id="options-panel">
+                <div class="card mx-auto" style="max-width: 700px;">
+                    <div class="card-body text-start">
+                        <div class="row g-3">
+                            <!-- Theme Controls -->
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Location Type</label>
+                                <select class="form-select form-select-sm" id="opt-location">
+                                    {% for value, label in location_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Time of Day</label>
+                                <select class="form-select form-select-sm" id="opt-time">
+                                    {% for value, label in time_options %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Mood</label>
+                                <select class="form-select form-select-sm" id="opt-mood">
+                                    {% for value, label in mood_options %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Video Controls -->
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Voice</label>
+                                <select class="form-select form-select-sm" id="opt-voice">
+                                    {% for voice_id, voice_name in voices %}
+                                    <option value="{{ voice_id }}">{{ voice_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Duration</label>
+                                <select class="form-select form-select-sm" id="opt-duration">
+                                    <option value="short">Short (~15s)</option>
+                                    <option value="medium" selected>Medium (~25s)</option>
+                                    <option value="long">Long (~35s)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted">Music</label>
+                                <select class="form-select form-select-sm" id="opt-music">
+                                    <option value="random">Random</option>
+                                    <option value="none">No Music</option>
+                                    {% for file in music_files %}
+                                    <option value="{{ file }}">{{ file }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Advanced Options -->
+                            <div class="col-12">
+                                <hr class="my-2">
+                                <small class="text-muted">Advanced (Optional)</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Custom Theme</label>
+                                <input type="text" class="form-control form-control-sm" id="opt-custom-theme"
+                                       placeholder="e.g., Abandoned 1990s arcade at 2am">
+                                <div class="form-text small">Overrides AI theme generation</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted">Custom Screen Text</label>
+                                <input type="text" class="form-control form-control-sm" id="opt-custom-text"
+                                       placeholder="e.g., Sector 7 — 3:33 AM">
+                                <div class="form-text small">Overrides AI-generated overlay text</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button id="generate-btn" class="btn btn-liminal btn-lg">
                 <i class="bi bi-play-fill me-2"></i>Generate New Video
             </button>
@@ -92,11 +178,27 @@ document.getElementById('generate-btn').addEventListener('click', function() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
 
+    // Gather options from form
+    const formData = new FormData();
+    formData.append('location', document.getElementById('opt-location').value);
+    formData.append('time', document.getElementById('opt-time').value);
+    formData.append('mood', document.getElementById('opt-mood').value);
+    formData.append('voice', document.getElementById('opt-voice').value);
+    formData.append('duration', document.getElementById('opt-duration').value);
+    formData.append('music', document.getElementById('opt-music').value);
+
+    // Optional custom fields
+    const customTheme = document.getElementById('opt-custom-theme').value.trim();
+    const customText = document.getElementById('opt-custom-text').value.trim();
+    if (customTheme) formData.append('custom_theme', customTheme);
+    if (customText) formData.append('custom_text', customText);
+
     fetch('{{ url_for("generate") }}', {
         method: 'POST',
         headers: {
             'X-Requested-With': 'XMLHttpRequest'
-        }
+        },
+        body: formData
     })
     .then(response => response.json())
     .then(data => {

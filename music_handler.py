@@ -32,6 +32,32 @@ def get_random_music() -> Optional[str]:
     return os.path.join(config.MUSIC_DIR, selected)
 
 
+def get_music(selection: str = None) -> Optional[str]:
+    """
+    Get a music file based on selection.
+
+    Args:
+        selection: Music file name, 'random' for random selection,
+                   'none' for no music, or None for random
+
+    Returns:
+        str or None: Path to selected music file, or None if no music
+    """
+    if selection == 'none':
+        return None
+
+    if selection is None or selection == 'random':
+        return get_random_music()
+
+    # Specific file selected
+    music_path = os.path.join(config.MUSIC_DIR, selection)
+    if os.path.exists(music_path):
+        return music_path
+
+    # Fallback to random if specified file doesn't exist
+    return get_random_music()
+
+
 def list_music_files() -> list:
     """
     List all available music files.

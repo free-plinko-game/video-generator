@@ -96,7 +96,8 @@ def assemble_video(
     screen_text: str,
     output_path: str,
     voice_volume: float = None,
-    music_volume: float = None
+    music_volume: float = None,
+    duration_padding: float = 5.0
 ) -> tuple:
     """
     Assemble the final video from components.
@@ -109,6 +110,7 @@ def assemble_video(
         output_path: Path to save the output video
         voice_volume: Volume for voice (0.0-1.0)
         music_volume: Volume for music (0.0-1.0)
+        duration_padding: Seconds to add after voiceover ends
 
     Returns:
         tuple: (output_path, duration_seconds)
@@ -122,8 +124,8 @@ def assemble_video(
     voice_audio = AudioFileClip(voice_path)
     voice_duration = voice_audio.duration
 
-    # Add padding to video duration (5 seconds after voiceover for longer videos)
-    video_duration = voice_duration + 5.0
+    # Add padding to video duration
+    video_duration = voice_duration + duration_padding
 
     # Create the image clip with Ken Burns effect
     video_clip = create_ken_burns_clip(image_path, video_duration)

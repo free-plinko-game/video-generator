@@ -10,8 +10,16 @@ from theme_generator import generate_theme
 from prompt_generator import generate_prompts
 from image_generator import generate_image
 from voice_generator import generate_voice
-from music_handler import get_random_music
+from music_handler import get_music
 from assembler import assemble_video
+
+
+# Duration presets (in seconds of padding after voiceover)
+DURATION_PRESETS = {
+    'short': 2.0,     # ~15 second videos
+    'medium': 5.0,    # ~25 second videos (default)
+    'long': 10.0,     # ~35 second videos
+}
 
 
 class VideoGenerationError(Exception):
@@ -19,13 +27,21 @@ class VideoGenerationError(Exception):
     pass
 
 
-def generate_video(video_id: int = None, voice: str = None) -> dict:
+def generate_video(video_id: int = None, options: dict = None) -> dict:
     """
     Generate a complete liminal space video.
 
     Args:
         video_id: Optional existing video ID to use (creates new if None)
-        voice: Optional voice ID to use for narration
+        options: Optional dict with customization options:
+            - voice: Voice ID to use for narration
+            - location: Location type constraint
+            - time: Time of day constraint
+            - mood: Mood constraint
+            - duration: 'short', 'medium', or 'long'
+            - music: Music file name, 'random', or 'none'
+            - custom_text: Custom screen text (overrides AI generation)
+            - custom_theme: Fully custom theme text (skips AI theme generation)
 
     Returns:
         dict: Video record with all generated content
@@ -33,14 +49,37 @@ def generate_video(video_id: int = None, voice: str = None) -> dict:
     Raises:
         VideoGenerationError: If any step fails
     """
+    if options is None:
+        options = {}
+
     # Create database record if not provided
     if video_id is None:
         video_id = db.create_video()
 
     try:
-        # Step 1: Generate theme
+        # Step 1: Generate or use custom theme
         db.update_status(video_id, 'generating_theme')
-        theme = generate_theme()
+
+        if options.get('custom_theme'):
+            # Use fully custom theme
+            theme = {
+                'location': options.get('custom_theme'),
+                'time': options.get('time', 'late night'),
+                'mood': options.get('mood', 'liminal'),
+                'detail': 'flickering fluorescent light',
+                'memory_hook': 'a place you visited once, long ago'
+            }
+        else:
+            # Generate with constraints
+            constraints = {}
+            if options.get('location'):
+                constraints['location'] = options['location']
+            if options.get('time'):
+                constraints['time'] = options['time']
+            if options.get('mood'):
+                constraints['mood'] = options['mood']
+
+            theme = generate_theme(constraints if constraints else None)
 
         # Save theme to database
         db.update_video(
@@ -55,6 +94,10 @@ def generate_video(video_id: int = None, voice: str = None) -> dict:
         # Step 2: Generate prompts
         db.update_status(video_id, 'generating_prompts')
         prompts = generate_prompts(theme)
+
+        # Override screen text if custom text provided
+        if options.get('custom_text'):
+            prompts['screen_text'] = options['custom_text']
 
         # Save prompts to database
         db.update_video(
@@ -73,12 +116,14 @@ def generate_video(video_id: int = None, voice: str = None) -> dict:
         # Step 4: Generate voiceover
         db.update_status(video_id, 'creating_voice')
         voice_path = os.path.join(config.TEMP_DIR, f"voice_{video_id}.mp3")
+        voice = options.get('voice', config.DEFAULT_VOICE)
         generate_voice(prompts['voiceover_script'], voice_path, voice)
         db.update_video(video_id, voice_path=voice_path)
 
         # Step 5: Select music
         db.update_status(video_id, 'selecting_music')
-        music_path = get_random_music()
+        music_selection = options.get('music', 'random')
+        music_path = get_music(music_selection)
         if music_path:
             db.update_video(video_id, music_path=music_path)
 
@@ -87,12 +132,17 @@ def generate_video(video_id: int = None, voice: str = None) -> dict:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_path = os.path.join(config.OUTPUT_DIR, f"liminal_{video_id}_{timestamp}.mp4")
 
+        # Get duration padding
+        duration_preset = options.get('duration', 'medium')
+        duration_padding = DURATION_PRESETS.get(duration_preset, 5.0)
+
         output_path, duration = assemble_video(
             image_path=image_path,
             voice_path=voice_path,
             music_path=music_path,
             screen_text=prompts['screen_text'],
-            output_path=output_path
+            output_path=output_path,
+            duration_padding=duration_padding
         )
 
         # Step 7: Mark complete
