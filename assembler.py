@@ -3,7 +3,7 @@
 import os
 from moviepy import (
     ImageClip, AudioFileClip, CompositeVideoClip, CompositeAudioClip,
-    TextClip, concatenate_audioclips, vfx
+    TextClip, concatenate_audioclips, vfx, afx
 )
 import numpy as np
 
@@ -163,7 +163,7 @@ def assemble_video(
         music_audio = music_audio.subclipped(0, video_duration)
 
         # Apply fade out (last 2 seconds)
-        music_audio = music_audio.audio_fadeout(2)
+        music_audio = music_audio.with_effects([afx.AudioFadeOut(2)])
 
         # Reduce volume
         music_audio = music_audio.with_volume_scaled(music_volume)
