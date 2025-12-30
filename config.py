@@ -36,7 +36,7 @@ AVAILABLE_VOICES = [
 
 # Hugging Face model
 HF_IMAGE_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_IMAGE_MODEL}"
+HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{HF_IMAGE_MODEL}"
 
 # Generation settings
 IMAGE_WIDTH = 768   # SDXL supported dimensions (closest to 9:16)
