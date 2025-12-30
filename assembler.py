@@ -173,8 +173,14 @@ def assemble_video(
     # Combine audio tracks
     if len(audio_tracks) > 1:
         final_audio = CompositeAudioClip(audio_tracks)
+        final_audio = final_audio.with_duration(video_duration)
     else:
         final_audio = audio_tracks[0]
+        # Pad single audio track with silence if needed
+        if final_audio.duration < video_duration:
+            from moviepy import AudioClip
+            silence = AudioClip(lambda t: 0, duration=video_duration - final_audio.duration)
+            final_audio = concatenate_audioclips([final_audio, silence])
 
     # Set audio on video
     final_video = final_video.with_audio(final_audio)
