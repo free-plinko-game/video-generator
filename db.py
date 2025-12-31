@@ -446,6 +446,14 @@ def set_error(video_id: int, error_message: str) -> None:
 def mark_complete(video_id: int, output_path: str, duration_seconds: float) -> None:
     """Mark video as complete with output path and duration."""
     with get_db() as conn:
+        # Get content_type_id first
+        row = conn.execute(
+            "SELECT content_type_id FROM videos WHERE id = ?",
+            (video_id,)
+        ).fetchone()
+        content_type_id = row[0] if row else None
+
+        # Update video status
         conn.execute(
             """UPDATE videos SET
                status = 'complete',
@@ -456,10 +464,12 @@ def mark_complete(video_id: int, output_path: str, duration_seconds: float) -> N
             (datetime.now().isoformat(), output_path, duration_seconds, video_id)
         )
 
-        # Increment content type count
-        video = get_video(video_id)
-        if video and video.get('content_type_id'):
-            increment_content_type_count(video['content_type_id'])
+        # Increment content type count in same transaction
+        if content_type_id:
+            conn.execute(
+                "UPDATE content_types SET videos_count = videos_count + 1 WHERE id = ?",
+                (content_type_id,)
+            )
 
 
 def get_video(video_id: int) -> Optional[Dict[str, Any]]:
