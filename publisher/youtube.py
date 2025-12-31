@@ -1,6 +1,7 @@
-"""YouTube API integration for uploading videos as Shorts."""
+"""YouTube API integration for uploading videos - multi-account support."""
 
 import os
+import sys
 import json
 import httplib2
 from typing import Optional, Dict, Any
@@ -13,36 +14,57 @@ from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
 import anthropic
 
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+import db
 
 
-def is_authenticated() -> bool:
-    """Check if YouTube credentials exist and are valid."""
-    if not os.path.exists(config.YOUTUBE_CREDENTIALS_FILE):
-        return False
-
-    try:
-        creds = _load_credentials()
-        return creds is not None and creds.valid
-    except Exception:
-        return False
+def get_credentials_path(account_id: int) -> str:
+    """Get the credentials file path for an account."""
+    return os.path.join(config.CREDENTIALS_DIR, f"account_{account_id}.json")
 
 
-def _load_credentials() -> Optional[Credentials]:
+def is_authenticated(account_id: int = None) -> bool:
+    """
+    Check if YouTube credentials exist and are valid.
+
+    Args:
+        account_id: Specific account ID, or None to check for any account
+    """
+    if account_id:
+        account = db.get_youtube_account(account_id)
+        if not account:
+            return False
+        creds_path = account.get('credentials_path')
+        if not creds_path or not os.path.exists(creds_path):
+            return False
+        try:
+            creds = _load_credentials(creds_path)
+            return creds is not None and creds.valid
+        except Exception:
+            return False
+    else:
+        # Check if any account is authenticated
+        accounts = db.get_all_youtube_accounts()
+        return len(accounts) > 0
+
+
+def _load_credentials(creds_path: str) -> Optional[Credentials]:
     """Load credentials from file."""
-    if not os.path.exists(config.YOUTUBE_CREDENTIALS_FILE):
+    if not os.path.exists(creds_path):
         return None
 
     try:
         creds = Credentials.from_authorized_user_file(
-            config.YOUTUBE_CREDENTIALS_FILE,
+            creds_path,
             config.YOUTUBE_SCOPES
         )
 
         # Refresh if expired
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            _save_credentials(creds)
+            _save_credentials(creds, creds_path)
 
         return creds
     except Exception as e:
@@ -50,17 +72,20 @@ def _load_credentials() -> Optional[Credentials]:
         return None
 
 
-def _save_credentials(creds: Credentials) -> None:
+def _save_credentials(creds: Credentials, creds_path: str) -> None:
     """Save credentials to file."""
-    os.makedirs(os.path.dirname(config.YOUTUBE_CREDENTIALS_FILE), exist_ok=True)
+    os.makedirs(os.path.dirname(creds_path), exist_ok=True)
 
-    with open(config.YOUTUBE_CREDENTIALS_FILE, 'w') as f:
+    with open(creds_path, 'w') as f:
         f.write(creds.to_json())
 
 
-def get_authenticated_service():
+def get_authenticated_service(account_id: int = None):
     """
     Get an authenticated YouTube API service.
+
+    Args:
+        account_id: Account ID to use, or None for default account
 
     Returns:
         YouTube API service object
@@ -68,91 +93,38 @@ def get_authenticated_service():
     Raises:
         ValueError: If not authenticated
     """
-    creds = _load_credentials()
+    if account_id is None:
+        account = db.get_default_youtube_account()
+    else:
+        account = db.get_youtube_account(account_id)
+
+    if not account:
+        raise ValueError("No YouTube account found. Please connect an account.")
+
+    creds_path = account.get('credentials_path')
+    if not creds_path or not os.path.exists(creds_path):
+        raise ValueError("YouTube credentials not found. Please reconnect the account.")
+
+    creds = _load_credentials(creds_path)
 
     if not creds or not creds.valid:
-        raise ValueError("YouTube not authenticated. Please connect your account in Settings.")
+        raise ValueError("YouTube credentials invalid. Please reconnect the account.")
 
     return build('youtube', 'v3', credentials=creds)
 
 
-def run_oauth_flow(redirect_uri: str = None) -> str:
+def get_channel_info(account_id: int = None) -> Optional[Dict[str, Any]]:
     """
-    Start the OAuth flow for YouTube authentication.
+    Get information about a YouTube channel.
 
     Args:
-        redirect_uri: Optional redirect URI for web flow
-
-    Returns:
-        str: Authorization URL for the user to visit
-
-    Raises:
-        ValueError: If client secrets file not found
-    """
-    if not os.path.exists(config.GOOGLE_CLIENT_SECRETS_FILE):
-        raise ValueError(
-            "client_secrets.json not found. Please download it from Google Cloud Console "
-            "and place it in the project root directory."
-        )
-
-    flow = InstalledAppFlow.from_client_secrets_file(
-        config.GOOGLE_CLIENT_SECRETS_FILE,
-        scopes=config.YOUTUBE_SCOPES,
-        redirect_uri=redirect_uri
-    )
-
-    return flow
-
-
-def complete_oauth_flow(flow, authorization_response: str) -> Credentials:
-    """
-    Complete the OAuth flow after user authorization.
-
-    Args:
-        flow: The OAuth flow object
-        authorization_response: The full callback URL with code
-
-    Returns:
-        Credentials object
-    """
-    flow.fetch_token(authorization_response=authorization_response)
-    creds = flow.credentials
-    _save_credentials(creds)
-    return creds
-
-
-def run_local_oauth_flow() -> bool:
-    """
-    Run OAuth flow locally (opens browser).
-    Use this for command-line setup.
-
-    Returns:
-        bool: True if successful
-    """
-    if not os.path.exists(config.GOOGLE_CLIENT_SECRETS_FILE):
-        raise ValueError(
-            "client_secrets.json not found. Please download it from Google Cloud Console."
-        )
-
-    flow = InstalledAppFlow.from_client_secrets_file(
-        config.GOOGLE_CLIENT_SECRETS_FILE,
-        scopes=config.YOUTUBE_SCOPES
-    )
-
-    creds = flow.run_local_server(port=8090)
-    _save_credentials(creds)
-    return True
-
-
-def get_channel_info() -> Optional[Dict[str, Any]]:
-    """
-    Get information about the authenticated YouTube channel.
+        account_id: Account ID to check, or None for default
 
     Returns:
         Dict with channel info or None if not authenticated
     """
     try:
-        youtube = get_authenticated_service()
+        youtube = get_authenticated_service(account_id)
         response = youtube.channels().list(
             part='snippet,statistics',
             mine=True
@@ -174,26 +146,68 @@ def get_channel_info() -> Optional[Dict[str, Any]]:
         return None
 
 
-def disconnect() -> bool:
+def create_account_from_oauth(creds: Credentials, account_name: str = None) -> int:
     """
-    Disconnect YouTube account by removing credentials.
+    Create a new YouTube account record from OAuth credentials.
+
+    Args:
+        creds: OAuth credentials
+        account_name: Optional name for the account
+
+    Returns:
+        Account ID
+    """
+    # Find next available account ID
+    accounts = db.get_all_youtube_accounts()
+    next_id = max([a['id'] for a in accounts], default=0) + 1
+
+    # Save credentials to file
+    creds_path = get_credentials_path(next_id)
+    _save_credentials(creds, creds_path)
+
+    # Get channel info
+    youtube = build('youtube', 'v3', credentials=creds)
+    response = youtube.channels().list(part='snippet', mine=True).execute()
+
+    channel_id = None
+    channel_name = None
+    if response.get('items'):
+        channel = response['items'][0]
+        channel_id = channel['id']
+        channel_name = channel['snippet']['title']
+
+    if not account_name:
+        account_name = channel_name or f"Account {next_id}"
+
+    # Create database record
+    account_id = db.create_youtube_account(
+        name=account_name,
+        credentials_path=creds_path,
+        channel_id=channel_id,
+        channel_name=channel_name
+    )
+
+    return account_id
+
+
+def disconnect(account_id: int) -> bool:
+    """
+    Disconnect a YouTube account.
+
+    Args:
+        account_id: Account ID to disconnect
 
     Returns:
         bool: True if successful
     """
-    try:
-        if os.path.exists(config.YOUTUBE_CREDENTIALS_FILE):
-            os.remove(config.YOUTUBE_CREDENTIALS_FILE)
-        return True
-    except Exception as e:
-        print(f"Error disconnecting: {e}")
-        return False
+    return db.delete_youtube_account(account_id)
 
 
 def upload_video(
     video_path: str,
     title: str,
     description: str,
+    account_id: int = None,
     tags: list = None,
     privacy: str = None,
     category: str = None
@@ -205,6 +219,7 @@ def upload_video(
         video_path: Path to the video file
         title: Video title
         description: Video description
+        account_id: Account to upload to (uses default if None)
         tags: List of tags
         privacy: Privacy status ('public', 'private', 'unlisted')
         category: YouTube category ID
@@ -226,7 +241,7 @@ def upload_video(
     if category is None:
         category = config.YOUTUBE_DEFAULT_CATEGORY
 
-    youtube = get_authenticated_service()
+    youtube = get_authenticated_service(account_id)
 
     # Prepare video metadata
     body = {
@@ -272,36 +287,60 @@ def upload_video(
     }
 
 
-def generate_video_metadata(video_record: Dict[str, Any]) -> Dict[str, Any]:
+def generate_video_metadata(video_record: Dict[str, Any], content_type: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Generate YouTube title and description using Claude.
 
     Args:
         video_record: Video database record
+        content_type: Optional content type for context
 
     Returns:
         Dict with 'title', 'description', 'tags'
     """
+    # Build context from video record
+    theme_data = video_record.get('theme_data')
+    if theme_data and isinstance(theme_data, str):
+        try:
+            theme_data = json.loads(theme_data)
+        except:
+            theme_data = {}
+
+    content_type_name = video_record.get('content_type_name', 'Video')
+
+    # Build a description of the video content
+    content_desc = ""
+    if theme_data:
+        content_desc = json.dumps(theme_data, indent=2)
+    else:
+        content_desc = f"""
+Location: {video_record.get('location', 'Unknown')}
+Time: {video_record.get('time_of_day', 'Unknown')}
+Mood: {video_record.get('mood', 'Unknown')}
+Voiceover: {video_record.get('voiceover_script', '')}
+"""
+
     if not config.ANTHROPIC_API_KEY:
         # Return default metadata if no API key
         return {
-            'title': f"Liminal Space: {video_record.get('location', 'Unknown')} #{video_record.get('id', '')}",
-            'description': f"{video_record.get('voiceover_script', '')}\n\n#shorts #liminal #liminalspace",
+            'title': f"{content_type_name}: #{video_record.get('id', '')}",
+            'description': f"{video_record.get('voiceover_script', '')}\n\n#shorts",
             'tags': config.YOUTUBE_DEFAULT_TAGS
         }
 
-    prompt = f"""Generate YouTube Shorts metadata for a liminal space video.
+    prompt = f"""Generate YouTube Shorts metadata for this video.
+
+Content Type: {content_type_name}
 
 Video concept:
-- Location: {video_record.get('location', 'Unknown location')}
-- Time: {video_record.get('time_of_day', 'Late night')}
-- Mood: {video_record.get('mood', 'Eerie')}
-- Voiceover: {video_record.get('voiceover_script', '')}
+{content_desc}
+
+Screen text: {video_record.get('screen_text', '')}
 
 Return JSON only, no other text:
 {{
-  "title": "Engaging title, under 70 chars, include 'liminal' or mysterious hook",
-  "description": "2-3 sentences, atmospheric, include hashtags at end. Add #shorts",
+  "title": "Engaging title, under 70 chars, intriguing hook",
+  "description": "2-3 sentences describing the video, include relevant hashtags at end. Always include #shorts",
   "tags": ["array", "of", "relevant", "tags", "max 10"]
 }}
 
@@ -327,9 +366,9 @@ Make it intriguing and clickable without being clickbait."""
 
         # Ensure required fields
         if 'title' not in metadata:
-            metadata['title'] = f"Liminal Space: {video_record.get('location', 'Unknown')}"
+            metadata['title'] = f"{content_type_name} #{video_record.get('id', '')}"
         if 'description' not in metadata:
-            metadata['description'] = f"{video_record.get('voiceover_script', '')}\n\n#shorts #liminal"
+            metadata['description'] = f"{video_record.get('voiceover_script', '')}\n\n#shorts"
         if 'tags' not in metadata:
             metadata['tags'] = config.YOUTUBE_DEFAULT_TAGS
 
@@ -338,24 +377,25 @@ Make it intriguing and clickable without being clickbait."""
     except Exception as e:
         print(f"Error generating metadata: {e}")
         return {
-            'title': f"Liminal Space: {video_record.get('location', 'Unknown')}",
-            'description': f"{video_record.get('voiceover_script', '')}\n\n#shorts #liminal #liminalspace",
+            'title': f"{content_type_name} #{video_record.get('id', '')}",
+            'description': f"{video_record.get('voiceover_script', '')}\n\n#shorts",
             'tags': config.YOUTUBE_DEFAULT_TAGS
         }
 
 
-def delete_video(video_id: str) -> bool:
+def delete_video(video_id: str, account_id: int = None) -> bool:
     """
     Delete a video from YouTube.
 
     Args:
         video_id: YouTube video ID
+        account_id: Account that owns the video
 
     Returns:
         bool: True if successful
     """
     try:
-        youtube = get_authenticated_service()
+        youtube = get_authenticated_service(account_id)
         youtube.videos().delete(id=video_id).execute()
         return True
     except HttpError as e:
@@ -364,22 +404,15 @@ def delete_video(video_id: str) -> bool:
 
 
 if __name__ == "__main__":
-    # Command-line setup helper
-    print("YouTube OAuth Setup")
+    # Command-line helper
+    print("YouTube Multi-Account Manager")
     print("=" * 40)
 
-    if is_authenticated():
-        print("Already authenticated!")
-        channel = get_channel_info()
-        if channel:
-            print(f"Connected as: {channel['title']}")
+    accounts = db.get_all_youtube_accounts()
+    if accounts:
+        print(f"Connected accounts: {len(accounts)}")
+        for acc in accounts:
+            default = " (default)" if acc.get('is_default') else ""
+            print(f"  - {acc['name']}: {acc.get('channel_name', 'Unknown')}{default}")
     else:
-        print("Starting OAuth flow...")
-        try:
-            run_local_oauth_flow()
-            print("Successfully authenticated!")
-            channel = get_channel_info()
-            if channel:
-                print(f"Connected as: {channel['title']}")
-        except Exception as e:
-            print(f"Error: {e}")
+        print("No accounts connected yet.")

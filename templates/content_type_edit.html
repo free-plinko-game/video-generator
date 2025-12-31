@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if content_type else 'New' }} Content Type - Content Factory{% endblock %}
+
+{% block extra_css %}
+<style>
+    .prompt-textarea {
+        font-family: monospace;
+        font-size: 0.85rem;
+        min-height: 150px;
+    }
+    .prompt-help {
+        font-size: 0.75rem;
+        color: var(--factory-accent);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{{ url_for('content_types_list') }}" class="text-muted text-decoration-none">
+        <i class="bi bi-arrow-left me-2"></i>Back to Content Types
+    </a>
+</div>
+
+<h2 class="mb-4" style="font-weight: 300; letter-spacing: 2px;">
+    {{ 'EDIT' if content_type else 'NEW' }} CONTENT TYPE
+</h2>
+
+<form method="post">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Basic Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-info-circle me-2"></i>Basic Information
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required
+                                   value="{{ content_type.name if content_type else '' }}"
+                                   placeholder="e.g., Liminal Spaces">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="slug" class="form-label">Slug</label>
+                            <input type="text" class="form-control" id="slug" name="slug" required
+                                   value="{{ content_type.slug if content_type else '' }}"
+                                   pattern="[a-z0-9_]+" title="lowercase letters, numbers, and underscores only"
+                                   placeholder="e.g., liminal_spaces">
+                            <div class="form-text">Used in URLs and code. Lowercase, no spaces.</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <input type="text" class="form-control" id="description" name="description"
+                               value="{{ content_type.description if content_type else '' }}"
+                               placeholder="Short description of this content type">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="icon" class="form-label">Icon</label>
+                            <select class="form-select" id="icon" name="icon">
+                                <option value="" {% if not content_type or not content_type.icon %}selected{% endif %}>Default</option>
+                                <option value="moon-icon" {% if content_type and content_type.icon == 'moon-icon' %}selected{% endif %}>Moon (Liminal)</option>
+                                <option value="alert-icon" {% if content_type and content_type.icon == 'alert-icon' %}selected{% endif %}>Alert (Scary)</option>
+                                <option value="ghost-icon" {% if content_type and content_type.icon == 'ghost-icon' %}selected{% endif %}>Ghost (Horror)</option>
+                                <option value="video-icon" {% if content_type and content_type.icon == 'video-icon' %}selected{% endif %}>Cassette (Nostalgia)</option>
+                                <option value="droplet-icon" {% if content_type and content_type.icon == 'droplet-icon' %}selected{% endif %}>Droplet (Thoughts)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="default_duration" class="form-label">Default Duration (seconds)</label>
+                            <input type="number" class="form-control" id="default_duration" name="default_duration"
+                                   value="{{ content_type.default_duration if content_type else 14 }}"
+                                   min="5" max="60">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Theme Prompt -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-chat-text me-2"></i>Theme Generation Prompt
+                </div>
+                <div class="card-body">
+                    <p class="prompt-help mb-2">
+                        This prompt tells Claude how to generate the concept/theme. Should return JSON with the fields your content needs.
+                    </p>
+                    <textarea class="form-control prompt-textarea" id="theme_prompt" name="theme_prompt" required
+                              placeholder="Generate a concept for this content type. Return JSON with fields like: location, mood, etc.">{{ content_type.theme_prompt if content_type else '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Image Style Prompt -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-image me-2"></i>Image Style Prompt
+                </div>
+                <div class="card-body">
+                    <p class="prompt-help mb-2">
+                        Style keywords added to image generation prompts. Describes the visual aesthetic.
+                    </p>
+                    <textarea class="form-control prompt-textarea" id="image_style_prompt" name="image_style_prompt" required
+                              style="min-height: 80px;"
+                              placeholder="dark, moody, cinematic, vertical 9:16 composition">{{ content_type.image_style_prompt if content_type else '' }}</textarea>
+                </div>
+            </div>
+
+            <!-- Script Prompt -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-mic me-2"></i>Script Generation Prompt
+                </div>
+                <div class="card-body">
+                    <p class="prompt-help mb-2">
+                        Instructions for generating the voiceover script. Describes tone, length, and style.
+                    </p>
+                    <textarea class="form-control prompt-textarea" id="script_prompt" name="script_prompt" required
+                              style="min-height: 80px;"
+                              placeholder="Write second-person narration, 15-25 words max. Whispered tone.">{{ content_type.script_prompt if content_type else '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Voice Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-soundwave me-2"></i>Voice Settings
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="voice_id" class="form-label">Voice</label>
+                        <select class="form-select" id="voice_id" name="voice_id">
+                            {% for voice_id, voice_name in voices %}
+                            <option value="{{ voice_id }}" {% if content_type and content_type.voice_id == voice_id %}selected{% endif %}>
+                                {{ voice_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label for="voice_style" class="form-label">Voice Style Notes</label>
+                        <input type="text" class="form-control" id="voice_style" name="voice_style"
+                               value="{{ content_type.voice_style if content_type else '' }}"
+                               placeholder="e.g., whispered, slow, contemplative">
+                        <div class="form-text">For your reference only.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Music Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-music-note me-2"></i>Music Settings
+                </div>
+                <div class="card-body">
+                    <div class="mb-0">
+                        <label for="music_folder" class="form-label">Music Folder</label>
+                        <select class="form-select" id="music_folder" name="music_folder">
+                            <option value="general" {% if not content_type or content_type.music_folder == 'general' %}selected{% endif %}>general</option>
+                            {% for folder in music_folders %}
+                            {% if folder != 'general' %}
+                            <option value="{{ folder }}" {% if content_type and content_type.music_folder == folder %}selected{% endif %}>
+                                {{ folder }}
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Music will be randomly selected from this folder.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-toggle-on me-2"></i>Status
+                </div>
+                <div class="card-body">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                               {% if not content_type or content_type.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="is_active">
+                            Active (visible on dashboard)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <button type="submit" class="btn btn-factory w-100 mb-3">
+                <i class="bi bi-check-lg me-2"></i>{{ 'Save Changes' if content_type else 'Create Content Type' }}
+            </button>
+
+            <a href="{{ url_for('content_types_list') }}" class="btn btn-outline-secondary w-100">
+                Cancel
+            </a>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-generate slug from name
+document.getElementById('name').addEventListener('input', function() {
+    const slugInput = document.getElementById('slug');
+    if (!slugInput.value || slugInput.dataset.autoGenerated === 'true') {
+        slugInput.value = this.value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '');
+        slugInput.dataset.autoGenerated = 'true';
+    }
+});
+
+document.getElementById('slug').addEventListener('input', function() {
+    this.dataset.autoGenerated = 'false';
+});
+</script>
+{% endblock %}

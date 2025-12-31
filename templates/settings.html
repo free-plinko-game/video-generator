@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Settings - Liminal Space Video Generator{% endblock %}
+{% block title %}Settings - Content Factory{% endblock %}
 
 {% block content %}
 <h2 class="mb-4" style="font-weight: 300; letter-spacing: 2px;">SETTINGS</h2>
@@ -37,7 +37,7 @@
             <!-- Voice Settings -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <i class="bi bi-mic me-2"></i>Voice Settings
+                    <i class="bi bi-mic me-2"></i>Default Voice Settings
                 </div>
                 <div class="card-body">
                     <div class="mb-0">
@@ -50,78 +50,59 @@
                             {% endfor %}
                         </select>
                         <div class="form-text">
-                            The voice used for whispered narration in videos.
+                            Used when a content type doesn't specify a voice. Each content type can have its own voice.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-liminal">
+            <button type="submit" class="btn btn-factory">
                 <i class="bi bi-check-lg me-2"></i>Save Settings
             </button>
         </form>
 
-        <!-- YouTube Settings (separate form) -->
+        <!-- YouTube Accounts Summary -->
         <div class="card mt-4">
-            <div class="card-header">
-                <i class="bi bi-youtube me-2"></i>YouTube Publishing
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-youtube me-2"></i>YouTube Accounts</span>
+                <a href="{{ url_for('accounts_list') }}" class="btn btn-outline-secondary btn-sm">
+                    Manage Accounts
+                </a>
             </div>
             <div class="card-body">
-                {% if youtube_authenticated %}
-                    <!-- Connected state -->
-                    <div class="d-flex align-items-center mb-3">
-                        <span class="badge bg-success me-2">Connected</span>
-                        {% if youtube_channel %}
-                        <span class="text-muted">{{ youtube_channel.title }}</span>
-                        {% endif %}
-                    </div>
-
-                    {% if youtube_channel %}
-                    <div class="row mb-3">
-                        <div class="col-6">
-                            <small class="text-muted d-block">Subscribers</small>
-                            <span>{{ youtube_channel.subscriber_count }}</span>
-                        </div>
-                        <div class="col-6">
-                            <small class="text-muted d-block">Videos</small>
-                            <span>{{ youtube_channel.video_count }}</span>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <form action="{{ url_for('youtube_disconnect') }}" method="post">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-x-circle me-1"></i>Disconnect
-                        </button>
-                    </form>
+                {% if youtube_accounts %}
+                    <p class="small text-muted mb-2">{{ youtube_accounts|length }} account(s) connected:</p>
+                    <ul class="list-unstyled mb-0">
+                        {% for account in youtube_accounts %}
+                        <li class="mb-1">
+                            <i class="bi bi-youtube text-danger me-1"></i>
+                            {{ account.name }}
+                            {% if account.channel_name %}<span class="text-muted">({{ account.channel_name }})</span>{% endif %}
+                            {% if account.is_default %}<span class="badge bg-success ms-1">Default</span>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
                 {% else %}
-                    <!-- Not connected state -->
-                    <div class="d-flex align-items-center mb-3">
-                        <span class="badge bg-secondary me-2">Not Connected</span>
-                    </div>
-
+                    <p class="small text-muted mb-3">No YouTube accounts connected yet.</p>
                     {% if client_secrets_exists %}
-                        <p class="small text-muted mb-3">
-                            Connect your YouTube account to publish videos directly as Shorts.
-                        </p>
-                        <a href="{{ url_for('youtube_auth') }}" class="btn btn-danger">
-                            <i class="bi bi-youtube me-2"></i>Connect YouTube Account
+                        <a href="{{ url_for('youtube_auth') }}" class="btn btn-danger btn-sm">
+                            <i class="bi bi-youtube me-1"></i>Connect Account
                         </a>
                     {% else %}
-                        <div class="alert alert-warning small mb-3">
+                        <div class="alert alert-warning small mb-0">
                             <i class="bi bi-exclamation-triangle me-1"></i>
-                            <strong>Setup Required:</strong> You need to add a <code>client_secrets.json</code> file.
+                            <strong>Setup Required:</strong> Add <code>client_secrets.json</code> to enable YouTube publishing.
+                            <a href="#" data-bs-toggle="collapse" data-bs-target="#youtube-setup-instructions">See instructions</a>
+                            <div class="collapse mt-2" id="youtube-setup-instructions">
+                                <ol class="mb-0">
+                                    <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                                    <li>Create a project and enable YouTube Data API v3</li>
+                                    <li>Create OAuth 2.0 credentials (Web application type)</li>
+                                    <li>Add <code>http://localhost:5000/youtube/callback</code> as authorized redirect URI</li>
+                                    <li>Download the JSON and save as <code>client_secrets.json</code> in project root</li>
+                                </ol>
+                            </div>
                         </div>
-                        <p class="small text-muted mb-0">
-                            <strong>Steps to set up:</strong>
-                            <ol class="mt-2 mb-0">
-                                <li>Go to <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
-                                <li>Create a project and enable YouTube Data API v3</li>
-                                <li>Create OAuth 2.0 credentials (Desktop app type)</li>
-                                <li>Download the JSON and save as <code>client_secrets.json</code> in project root</li>
-                                <li>Refresh this page and click Connect</li>
-                            </ol>
-                        </p>
                     {% endif %}
                 {% endif %}
             </div>
@@ -135,20 +116,20 @@
                 <i class="bi bi-music-note-beamed me-2"></i>Music Library
             </div>
             <div class="card-body">
-                {% if music_files %}
-                <p class="small text-muted mb-2">Available music loops:</p>
+                {% if music_folders %}
+                <p class="small text-muted mb-2">Music folders:</p>
                 <ul class="list-unstyled small mb-0">
-                    {% for file in music_files %}
+                    {% for folder, count in music_folders.items() %}
                     <li class="mb-1">
-                        <i class="bi bi-file-earmark-music me-1 text-muted"></i>
-                        {{ file }}
+                        <i class="bi bi-folder me-1 text-muted"></i>
+                        {{ folder }} <span class="text-muted">({{ count }} files)</span>
                     </li>
                     {% endfor %}
                 </ul>
                 {% else %}
                 <p class="text-muted small mb-2">No music files found.</p>
                 <p class="small mb-0">
-                    Add ambient/drone music loops to:<br>
+                    Add music loops to subfolders of:<br>
                     <code>assets/music_loops/</code>
                 </p>
                 {% endif %}
@@ -174,28 +155,38 @@
                     </span>
                 </div>
                 <div class="d-flex justify-content-between mb-2">
-                    <span class="text-muted">YouTube</span>
-                    <span class="badge {{ 'bg-success' if youtube_authenticated else 'bg-secondary' }}">
-                        {{ 'Connected' if youtube_authenticated else 'Not Connected' }}
-                    </span>
+                    <span class="text-muted">YouTube Accounts</span>
+                    <span>{{ youtube_accounts|length if youtube_accounts else 0 }}</span>
                 </div>
                 <div class="d-flex justify-content-between">
-                    <span class="text-muted">Music Files</span>
-                    <span>{{ music_files|length }}</span>
+                    <span class="text-muted">Content Types</span>
+                    <span>{{ content_types_count }}</span>
                 </div>
             </div>
         </div>
 
-        <!-- YouTube Info -->
+        <!-- Quick Links -->
         <div class="card mt-4">
             <div class="card-header">
-                <i class="bi bi-info-circle me-2"></i>YouTube Notes
+                <i class="bi bi-link-45deg me-2"></i>Quick Links
             </div>
-            <div class="card-body small text-muted">
-                <ul class="mb-0 ps-3">
-                    <li>Videos under 60s become Shorts automatically</li>
-                    <li>YouTube API has daily quota limits (~6 uploads/day on free tier)</li>
-                    <li>First upload may take time while YouTube processes</li>
+            <div class="card-body small">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <a href="{{ url_for('content_types_list') }}" class="text-decoration-none">
+                            <i class="bi bi-collection me-1"></i>Manage Content Types
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="{{ url_for('accounts_list') }}" class="text-decoration-none">
+                            <i class="bi bi-youtube me-1"></i>Manage YouTube Accounts
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('gallery') }}" class="text-decoration-none">
+                            <i class="bi bi-grid me-1"></i>View All Videos
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>

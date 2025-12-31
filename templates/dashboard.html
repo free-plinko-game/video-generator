@@ -1,107 +1,69 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Liminal Space Video Generator{% endblock %}
+{% block title %}Dashboard - Content Factory{% endblock %}
 
 {% block content %}
 <div class="row mb-5">
     <div class="col-12 text-center">
-        <h1 class="display-6 mb-3" style="font-weight: 300; letter-spacing: 3px;">LIMINAL SPACES</h1>
-        <p class="liminal-quote">"You've been here before. You just don't remember when."</p>
+        <h1 class="display-6 mb-3" style="font-weight: 300; letter-spacing: 3px;">CONTENT FACTORY</h1>
+        <p class="text-muted">Generate videos from multiple content types</p>
 
         <div id="generate-section" class="mt-4">
-            <!-- Toggle options button -->
-            <button type="button" class="btn btn-outline-secondary btn-sm mb-3" data-bs-toggle="collapse" data-bs-target="#options-panel">
-                <i class="bi bi-sliders me-1"></i>Customize Options
-            </button>
-
-            <!-- Options panel (collapsed by default) -->
-            <div class="collapse mb-4" id="options-panel">
-                <div class="card mx-auto" style="max-width: 700px;">
-                    <div class="card-body text-start">
-                        <div class="row g-3">
-                            <!-- Theme Controls -->
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Location Type</label>
-                                <select class="form-select form-select-sm" id="opt-location">
-                                    {% for value, label in location_types %}
-                                    <option value="{{ value }}">{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Time of Day</label>
-                                <select class="form-select form-select-sm" id="opt-time">
-                                    {% for value, label in time_options %}
-                                    <option value="{{ value }}">{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Mood</label>
-                                <select class="form-select form-select-sm" id="opt-mood">
-                                    {% for value, label in mood_options %}
-                                    <option value="{{ value }}">{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <!-- Video Controls -->
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Voice</label>
-                                <select class="form-select form-select-sm" id="opt-voice">
-                                    {% for voice_id, voice_name in voices %}
-                                    <option value="{{ voice_id }}">{{ voice_name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Duration</label>
-                                <select class="form-select form-select-sm" id="opt-duration">
-                                    <option value="short">Short (~15s)</option>
-                                    <option value="medium" selected>Medium (~25s)</option>
-                                    <option value="long">Long (~35s)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small text-muted">Music</label>
-                                <select class="form-select form-select-sm" id="opt-music">
-                                    <option value="random">Random</option>
-                                    <option value="none">No Music</option>
-                                    {% for file in music_files %}
-                                    <option value="{{ file }}">{{ file }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <!-- Advanced Options -->
-                            <div class="col-12">
-                                <hr class="my-2">
-                                <small class="text-muted">Advanced (Optional)</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Custom Theme</label>
-                                <input type="text" class="form-control form-control-sm" id="opt-custom-theme"
-                                       placeholder="e.g., Abandoned 1990s arcade at 2am">
-                                <div class="form-text small">Overrides AI theme generation</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small text-muted">Custom Screen Text</label>
-                                <input type="text" class="form-control form-control-sm" id="opt-custom-text"
-                                       placeholder="e.g., Sector 7 — 3:33 AM">
-                                <div class="form-text small">Overrides AI-generated overlay text</div>
-                            </div>
+            <!-- Content Type Selector -->
+            <h5 class="mb-3" style="font-weight: 300;">Select Content Type</h5>
+            <div class="row justify-content-center g-3 mb-4" id="content-types">
+                {% for ct in content_types %}
+                <div class="col-6 col-md-3 col-lg-2">
+                    <div class="content-type-card{% if loop.first %} selected{% endif %}"
+                         data-id="{{ ct.id }}"
+                         onclick="selectContentType(this, {{ ct.id }})">
+                        <div class="content-type-icon">
+                            {% if ct.icon == 'moon-icon' %}
+                                <i class="bi bi-moon-stars"></i>
+                            {% elif ct.icon == 'alert-icon' %}
+                                <i class="bi bi-exclamation-triangle"></i>
+                            {% elif ct.icon == 'ghost-icon' %}
+                                <i class="bi bi-emoji-dizzy"></i>
+                            {% elif ct.icon == 'video-icon' %}
+                                <i class="bi bi-cassette"></i>
+                            {% elif ct.icon == 'droplet-icon' %}
+                                <i class="bi bi-droplet"></i>
+                            {% else %}
+                                <i class="bi bi-collection"></i>
+                            {% endif %}
                         </div>
+                        <div class="small">{{ ct.name }}</div>
                     </div>
+                </div>
+                {% endfor %}
+
+                <!-- Add new content type card -->
+                <div class="col-6 col-md-3 col-lg-2">
+                    <a href="{{ url_for('content_type_new') }}" class="text-decoration-none">
+                        <div class="content-type-card" style="border-style: dashed;">
+                            <div class="content-type-icon text-muted">
+                                <i class="bi bi-plus-lg"></i>
+                            </div>
+                            <div class="small text-muted">New Type</div>
+                        </div>
+                    </a>
                 </div>
             </div>
 
-            <button id="generate-btn" class="btn btn-liminal btn-lg">
-                <i class="bi bi-play-fill me-2"></i>Generate New Video
+            {% if content_types %}
+            <button id="generate-btn" class="btn btn-factory btn-lg">
+                <i class="bi bi-play-fill me-2"></i>Generate Video
             </button>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                No content types available. <a href="{{ url_for('content_type_new') }}">Create one</a> to start generating videos.
+            </div>
+            {% endif %}
         </div>
 
         <div id="progress-section" class="mt-4 d-none">
-            <div class="card mx-auto" style="max-width: 500px;">
+            <div class="card mx-auto no-hover" style="max-width: 500px;">
                 <div class="card-body">
                     <h5 class="card-title mb-3">
                         <span class="status-indicator status-generating"></span>
@@ -117,12 +79,22 @@
     </div>
 </div>
 
-<h4 class="mb-4" style="font-weight: 300; letter-spacing: 2px;">RECENT VIDEOS</h4>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 style="font-weight: 300; letter-spacing: 2px;">RECENT VIDEOS</h4>
+    {% if content_types %}
+    <select class="form-select form-select-sm" style="width: auto;" id="filter-type" onchange="filterVideos()">
+        <option value="">All Types</option>
+        {% for ct in content_types %}
+        <option value="{{ ct.id }}">{{ ct.name }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+</div>
 
 {% if videos %}
 <div class="row g-4" id="videos-grid">
     {% for video in videos %}
-    <div class="col-6 col-md-4 col-lg-3">
+    <div class="col-6 col-md-4 col-lg-3 video-card" data-type="{{ video.content_type_id }}">
         <a href="{{ url_for('video_detail', video_id=video.id) }}" class="text-decoration-none">
             <div class="card h-100">
                 {% if video.image_path %}
@@ -136,8 +108,21 @@
                 </div>
                 {% endif %}
                 <div class="card-body">
-                    <p class="card-text small mb-1">{{ video.location or 'Generating...' }}</p>
-                    <small class="text-muted">{{ video.time_of_day or '' }}</small>
+                    <p class="card-text small mb-1">
+                        {% if video.content_type_icon == 'moon-icon' %}
+                            <i class="bi bi-moon-stars me-1"></i>
+                        {% elif video.content_type_icon == 'alert-icon' %}
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                        {% elif video.content_type_icon == 'ghost-icon' %}
+                            <i class="bi bi-emoji-dizzy me-1"></i>
+                        {% elif video.content_type_icon == 'video-icon' %}
+                            <i class="bi bi-cassette me-1"></i>
+                        {% endif %}
+                        {{ video.content_type_name or 'Video' }}
+                    </p>
+                    <small class="text-muted">
+                        {{ video.location or video.screen_text or 'Generating...' }}
+                    </small>
                     <div class="mt-2 d-flex align-items-center justify-content-between">
                         <span class="badge bg-{{ video.status|status_badge }}">{{ video.status }}</span>
                         {% if video.youtube_status == 'published' %}
@@ -146,10 +131,6 @@
                         </a>
                         {% elif video.youtube_status == 'uploading' %}
                         <span class="text-warning" title="Uploading to YouTube">
-                            <i class="bi bi-youtube"></i>
-                        </span>
-                        {% elif video.youtube_status == 'failed' %}
-                        <span class="text-danger" title="YouTube upload failed">
                             <i class="bi bi-youtube"></i>
                         </span>
                         {% endif %}
@@ -163,7 +144,7 @@
 {% else %}
 <div class="text-center py-5">
     <i class="bi bi-collection fs-1 text-muted mb-3 d-block"></i>
-    <p class="text-muted">No videos yet. Generate your first liminal space video.</p>
+    <p class="text-muted">No videos yet. Select a content type and generate your first video.</p>
 </div>
 {% endif %}
 {% endblock %}
@@ -172,26 +153,42 @@
 <script>
 let currentVideoId = null;
 let pollInterval = null;
+let selectedContentType = {{ content_types[0].id if content_types else 'null' }};
 
+function selectContentType(element, id) {
+    // Remove selection from all cards
+    document.querySelectorAll('.content-type-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    // Add selection to clicked card
+    element.classList.add('selected');
+    selectedContentType = id;
+}
+
+function filterVideos() {
+    const filterType = document.getElementById('filter-type').value;
+    document.querySelectorAll('.video-card').forEach(card => {
+        if (!filterType || card.dataset.type == filterType) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+{% if content_types %}
 document.getElementById('generate-btn').addEventListener('click', function() {
+    if (!selectedContentType) {
+        alert('Please select a content type');
+        return;
+    }
+
     const btn = this;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting...';
 
-    // Gather options from form
     const formData = new FormData();
-    formData.append('location', document.getElementById('opt-location').value);
-    formData.append('time', document.getElementById('opt-time').value);
-    formData.append('mood', document.getElementById('opt-mood').value);
-    formData.append('voice', document.getElementById('opt-voice').value);
-    formData.append('duration', document.getElementById('opt-duration').value);
-    formData.append('music', document.getElementById('opt-music').value);
-
-    // Optional custom fields
-    const customTheme = document.getElementById('opt-custom-theme').value.trim();
-    const customText = document.getElementById('opt-custom-text').value.trim();
-    if (customTheme) formData.append('custom_theme', customTheme);
-    if (customText) formData.append('custom_text', customText);
+    formData.append('content_type_id', selectedContentType);
 
     fetch('{{ url_for("generate") }}', {
         method: 'POST',
@@ -207,14 +204,19 @@ document.getElementById('generate-btn').addEventListener('click', function() {
             document.getElementById('generate-section').classList.add('d-none');
             document.getElementById('progress-section').classList.remove('d-none');
             startPolling();
+        } else if (data.error) {
+            alert(data.error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill me-2"></i>Generate Video';
         }
     })
     .catch(error => {
         console.error('Error:', error);
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-play-fill me-2"></i>Generate New Video';
+        btn.innerHTML = '<i class="bi bi-play-fill me-2"></i>Generate Video';
     });
 });
+{% endif %}
 
 function startPolling() {
     pollInterval = setInterval(checkStatus, 1000);

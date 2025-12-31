@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ video.location or 'Video' }} - Liminal Space Video Generator{% endblock %}
+{% block title %}{{ video.screen_text or video.location or 'Video' }} - Content Factory{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -17,8 +17,8 @@
     }
 
     .metadata-card {
-        background-color: var(--liminal-surface);
-        border: 1px solid var(--liminal-border);
+        background-color: var(--factory-surface);
+        border: 1px solid var(--factory-border);
         border-radius: 8px;
         padding: 20px;
         margin-bottom: 16px;
@@ -26,10 +26,10 @@
 
     .script-text {
         font-style: italic;
-        color: var(--liminal-text);
+        color: var(--factory-text);
         font-size: 1.1rem;
         line-height: 1.6;
-        border-left: 3px solid var(--liminal-accent);
+        border-left: 3px solid var(--factory-accent);
         padding-left: 16px;
     }
 
@@ -88,7 +88,7 @@
 
             <div class="mt-3 d-flex gap-2">
                 {% if video.status == 'complete' and video.output_path %}
-                <a href="{{ url_for('download_video', video_id=video.id) }}" class="btn btn-liminal flex-grow-1">
+                <a href="{{ url_for('download_video', video_id=video.id) }}" class="btn btn-factory flex-grow-1">
                     <i class="bi bi-download me-2"></i>Download
                 </a>
                 {% endif %}
@@ -154,12 +154,27 @@
 
                 {% else %}
                     <!-- Not published yet -->
-                    {% if youtube_authenticated %}
+                    {% if youtube_accounts %}
                         <form action="{{ url_for('publish_to_youtube', video_id=video.id) }}" method="post">
+                            {% if youtube_accounts|length > 1 %}
+                            <div class="mb-3">
+                                <label for="youtube_account" class="form-label small">Account</label>
+                                <select class="form-select form-select-sm" id="youtube_account" name="youtube_account_id">
+                                    {% for account in youtube_accounts %}
+                                    <option value="{{ account.id }}" {% if account.is_default %}selected{% endif %}>
+                                        {{ account.name }}{% if account.channel_name %} ({{ account.channel_name }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% else %}
+                            <input type="hidden" name="youtube_account_id" value="{{ youtube_accounts[0].id }}">
+                            {% endif %}
+
                             <div class="mb-3">
                                 <label for="youtube_title" class="form-label small">Title</label>
                                 <input type="text" class="form-control form-control-sm" id="youtube_title" name="youtube_title"
-                                       value="{{ youtube_metadata.title if youtube_metadata else video.location }}"
+                                       value="{{ youtube_metadata.title if youtube_metadata else (video.screen_text or video.location) }}"
                                        maxlength="100" required>
                             </div>
 
@@ -172,7 +187,7 @@
                             <div class="mb-3">
                                 <label for="youtube_tags" class="form-label small">Tags (comma-separated)</label>
                                 <input type="text" class="form-control form-control-sm" id="youtube_tags" name="youtube_tags"
-                                       value="{{ youtube_metadata.tags|join(', ') if youtube_metadata else 'liminal, liminalspace, shorts, ambient' }}">
+                                       value="{{ youtube_metadata.tags|join(', ') if youtube_metadata else 'shorts' }}">
                             </div>
 
                             <div class="mb-3">
@@ -189,9 +204,9 @@
                             </button>
                         </form>
                     {% else %}
-                        <p class="small text-muted mb-3">Connect your YouTube account to publish videos as Shorts.</p>
-                        <a href="{{ url_for('settings') }}" class="btn btn-outline-danger btn-sm">
-                            <i class="bi bi-gear me-1"></i>Go to Settings
+                        <p class="small text-muted mb-3">Connect a YouTube account to publish videos as Shorts.</p>
+                        <a href="{{ url_for('accounts_list') }}" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-youtube me-1"></i>Connect Account
                         </a>
                     {% endif %}
                 {% endif %}
@@ -204,7 +219,21 @@
     <div class="col-lg-7">
         <div class="d-flex justify-content-between align-items-start mb-4">
             <div>
-                <h2 class="mb-1" style="font-weight: 300;">{{ video.location or 'Generating...' }}</h2>
+                <p class="text-muted mb-1 small">
+                    {% if video.content_type_icon == 'moon-icon' %}
+                        <i class="bi bi-moon-stars me-1"></i>
+                    {% elif video.content_type_icon == 'alert-icon' %}
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                    {% elif video.content_type_icon == 'ghost-icon' %}
+                        <i class="bi bi-emoji-dizzy me-1"></i>
+                    {% elif video.content_type_icon == 'video-icon' %}
+                        <i class="bi bi-cassette me-1"></i>
+                    {% elif video.content_type_icon == 'droplet-icon' %}
+                        <i class="bi bi-droplet me-1"></i>
+                    {% endif %}
+                    {{ video.content_type_name or 'Video' }}
+                </p>
+                <h2 class="mb-1" style="font-weight: 300;">{{ video.screen_text or video.location or 'Generating...' }}</h2>
                 <p class="text-muted mb-0">{{ video.time_of_day or '' }}</p>
             </div>
             <div class="text-end">

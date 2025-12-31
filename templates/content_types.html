@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Content Types - Content Factory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 style="font-weight: 300; letter-spacing: 2px;">CONTENT TYPES</h2>
+    <a href="{{ url_for('content_type_new') }}" class="btn btn-factory">
+        <i class="bi bi-plus-lg me-2"></i>New Content Type
+    </a>
+</div>
+
+{% if content_types %}
+<div class="row g-4">
+    {% for ct in content_types %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 {% if not ct.is_active %}opacity-50{% endif %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="content-type-icon me-3">
+                            {% if ct.icon == 'moon-icon' %}
+                                <i class="bi bi-moon-stars fs-3"></i>
+                            {% elif ct.icon == 'alert-icon' %}
+                                <i class="bi bi-exclamation-triangle fs-3"></i>
+                            {% elif ct.icon == 'ghost-icon' %}
+                                <i class="bi bi-emoji-dizzy fs-3"></i>
+                            {% elif ct.icon == 'video-icon' %}
+                                <i class="bi bi-cassette fs-3"></i>
+                            {% elif ct.icon == 'droplet-icon' %}
+                                <i class="bi bi-droplet fs-3"></i>
+                            {% else %}
+                                <i class="bi bi-collection fs-3"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-0">{{ ct.name }}</h5>
+                            <small class="text-muted">{{ ct.slug }}</small>
+                        </div>
+                    </div>
+                    <span class="badge {{ 'bg-success' if ct.is_active else 'bg-secondary' }}">
+                        {{ 'Active' if ct.is_active else 'Inactive' }}
+                    </span>
+                </div>
+
+                {% if ct.description %}
+                <p class="card-text small text-muted mb-3">{{ ct.description }}</p>
+                {% endif %}
+
+                <div class="row mb-3 small">
+                    <div class="col-6">
+                        <span class="text-muted">Videos:</span>
+                        <span>{{ ct.videos_count or 0 }}</span>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted">Duration:</span>
+                        <span>{{ ct.default_duration }}s</span>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('content_type_edit', content_type_id=ct.id) }}" class="btn btn-outline-secondary btn-sm flex-grow-1">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                    <form action="{{ url_for('content_type_toggle', content_type_id=ct.id) }}" method="post">
+                        <button type="submit" class="btn btn-outline-{{ 'warning' if ct.is_active else 'success' }} btn-sm">
+                            <i class="bi bi-{{ 'pause' if ct.is_active else 'play' }}"></i>
+                        </button>
+                    </form>
+                    {% if ct.videos_count == 0 %}
+                    <form action="{{ url_for('content_type_delete', content_type_id=ct.id) }}" method="post"
+                          onsubmit="return confirm('Delete this content type?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-collection fs-1 text-muted mb-3 d-block"></i>
+    <p class="text-muted mb-4">No content types created yet.</p>
+    <a href="{{ url_for('content_type_new') }}" class="btn btn-factory">
+        <i class="bi bi-plus-lg me-2"></i>Create Your First Content Type
+    </a>
+</div>
+{% endif %}
+{% endblock %}

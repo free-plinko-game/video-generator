@@ -1,19 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}Gallery - Liminal Space Video Generator{% endblock %}
+{% block title %}Videos - Content Factory{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 style="font-weight: 300; letter-spacing: 2px;">ALL VIDEOS</h2>
-    <a href="{{ url_for('dashboard') }}" class="btn btn-liminal">
-        <i class="bi bi-plus-lg me-2"></i>New Video
-    </a>
+    <div class="d-flex gap-2">
+        {% if content_types %}
+        <select class="form-select form-select-sm" style="width: auto;" id="filter-type" onchange="filterVideos()">
+            <option value="">All Types</option>
+            {% for ct in content_types %}
+            <option value="{{ ct.id }}">{{ ct.name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <a href="{{ url_for('dashboard') }}" class="btn btn-factory">
+            <i class="bi bi-plus-lg me-2"></i>New Video
+        </a>
+    </div>
 </div>
 
 {% if videos %}
-<div class="row g-4">
+<div class="row g-4" id="videos-grid">
     {% for video in videos %}
-    <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+    <div class="col-6 col-md-4 col-lg-3 col-xl-2 video-card" data-type="{{ video.content_type_id }}">
         <a href="{{ url_for('video_detail', video_id=video.id) }}" class="text-decoration-none">
             <div class="card h-100">
                 {% if video.image_path %}
@@ -27,10 +37,26 @@
                 </div>
                 {% endif %}
                 <div class="card-body p-2">
-                    <p class="card-text small mb-1 text-truncate">{{ video.location or 'Unknown' }}</p>
+                    <p class="card-text small mb-1">
+                        {% if video.content_type_icon == 'moon-icon' %}
+                            <i class="bi bi-moon-stars me-1"></i>
+                        {% elif video.content_type_icon == 'alert-icon' %}
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                        {% elif video.content_type_icon == 'ghost-icon' %}
+                            <i class="bi bi-emoji-dizzy me-1"></i>
+                        {% elif video.content_type_icon == 'video-icon' %}
+                            <i class="bi bi-cassette me-1"></i>
+                        {% elif video.content_type_icon == 'droplet-icon' %}
+                            <i class="bi bi-droplet me-1"></i>
+                        {% endif %}
+                        {{ video.content_type_name or 'Video' }}
+                    </p>
+                    <p class="card-text small mb-1 text-truncate text-muted">{{ video.screen_text or video.location or 'Generating...' }}</p>
                     <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted">{{ video.time_of_day or '' }}</small>
                         <span class="badge bg-{{ video.status|status_badge }} badge-sm">{{ video.status }}</span>
+                        {% if video.youtube_status == 'published' %}
+                        <i class="bi bi-youtube text-danger"></i>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -42,9 +68,24 @@
 <div class="text-center py-5">
     <i class="bi bi-collection fs-1 text-muted mb-3 d-block"></i>
     <p class="text-muted mb-4">No videos generated yet.</p>
-    <a href="{{ url_for('dashboard') }}" class="btn btn-liminal">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-factory">
         <i class="bi bi-play-fill me-2"></i>Generate Your First Video
     </a>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterVideos() {
+    const filterType = document.getElementById('filter-type').value;
+    document.querySelectorAll('.video-card').forEach(card => {
+        if (!filterType || card.dataset.type == filterType) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+</script>
 {% endblock %}
