@@ -10,13 +10,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 
-def generate_prompts(theme: dict, content_type: dict) -> dict:
+def generate_prompts(theme: dict, content_type: dict, aspect_ratio: str = "9:16") -> dict:
     """
     Generate asset prompts from a theme concept using Claude API.
 
     Args:
         theme: Theme concept dict (structure varies by content type)
         content_type: Content type configuration with prompts and styles
+        aspect_ratio: "9:16" for vertical, "16:9" for horizontal
 
     Returns:
         dict: Asset prompts with image_prompt, voiceover_script, screen_text
@@ -35,12 +36,15 @@ def generate_prompts(theme: dict, content_type: dict) -> dict:
     script_instructions = content_type.get('script_prompt', '')
     voice_style = content_type.get('voice_style', '')
 
+    # Add aspect ratio hint to image prompt
+    aspect_hint = "vertical 9:16 composition" if aspect_ratio == "9:16" else "horizontal 16:9 cinematic composition"
+
     prompt = f"""Given this concept:
 {json.dumps(theme, indent=2)}
 
 Generate these assets. Return JSON only, no other text:
 {{
-  "image_prompt": "Detailed prompt for AI image generation. Include: {image_style}",
+  "image_prompt": "Detailed prompt for AI image generation. Include: {image_style}, {aspect_hint}",
   "voiceover_script": "{script_instructions} Voice style hint: {voice_style}",
   "screen_text": "Short location/context text for video overlay. Be cryptic and atmospheric."
 }}"""
