@@ -12,13 +12,29 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
 
-def generate_image(prompt: str, output_path: str) -> str:
+# Aspect ratio dimensions
+ASPECT_RATIOS = {
+    "9:16": (768, 1344),   # Vertical/Shorts (native SDXL dimensions)
+    "16:9": (1344, 768),   # Horizontal/Long-form
+    "1:1": (1024, 1024),   # Square
+}
+
+# Output dimensions after resize
+OUTPUT_DIMENSIONS = {
+    "9:16": (config.VIDEO_WIDTH, config.VIDEO_HEIGHT),  # 1080x1920
+    "16:9": (1920, 1080),  # 16:9 landscape
+    "1:1": (1080, 1080),   # Square
+}
+
+
+def generate_image(prompt: str, output_path: str, aspect_ratio: str = "9:16") -> str:
     """
     Generate an image using Hugging Face SDXL model.
 
     Args:
         prompt: The image generation prompt
         output_path: Path to save the generated image
+        aspect_ratio: "9:16" for vertical, "16:9" for horizontal, "1:1" for square
 
     Returns:
         str: Path to the saved image
@@ -30,13 +46,17 @@ def generate_image(prompt: str, output_path: str) -> str:
     if not config.HF_API_TOKEN:
         raise ValueError("HF_API_TOKEN is not configured")
 
+    # Get generation dimensions for aspect ratio
+    gen_width, gen_height = ASPECT_RATIOS.get(aspect_ratio, ASPECT_RATIOS["9:16"])
+    out_width, out_height = OUTPUT_DIMENSIONS.get(aspect_ratio, OUTPUT_DIMENSIONS["9:16"])
+
     headers = {"Authorization": f"Bearer {config.HF_API_TOKEN}"}
 
     payload = {
         "inputs": prompt,
         "parameters": {
-            "width": config.IMAGE_WIDTH,
-            "height": config.IMAGE_HEIGHT,
+            "width": gen_width,
+            "height": gen_height,
             "num_inference_steps": 30,
             "guidance_scale": 7.5,
         }
@@ -77,8 +97,8 @@ def generate_image(prompt: str, output_path: str) -> str:
     # Load the generated image
     image = Image.open(io.BytesIO(response.content))
 
-    # Resize/crop to target dimensions (1080x1920)
-    image = resize_and_crop(image, config.VIDEO_WIDTH, config.VIDEO_HEIGHT)
+    # Resize/crop to target dimensions based on aspect ratio
+    image = resize_and_crop(image, out_width, out_height)
 
     # Save the image
     image.save(output_path, "PNG", quality=95)
