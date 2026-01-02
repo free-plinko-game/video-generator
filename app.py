@@ -22,10 +22,10 @@ app.secret_key = os.urandom(24)
 active_generations = {}
 
 
-def run_generation(video_id: int, content_type_id: int):
+def run_generation(video_id: int, content_type_id: int, video_format_id: int):
     """Background thread function for video generation."""
     try:
-        generate_video(content_type_id, video_id)
+        generate_video(content_type_id, video_format_id, video_id)
     except VideoGenerationError:
         pass  # Error is already logged to database
     finally:
@@ -69,12 +69,14 @@ def run_youtube_upload(video_id: int, account_id: int, title: str, description: 
 
 @app.route('/')
 def dashboard():
-    """Dashboard with content type selector and recent videos."""
+    """Dashboard with content type and format selectors and recent videos."""
     content_types = db.get_active_content_types()
+    video_formats = db.get_active_video_formats()
     recent_videos = db.get_recent_videos(12)
     return render_template(
         'dashboard.html',
         content_types=content_types,
+        video_formats=video_formats,
         videos=recent_videos
     )
 
@@ -111,11 +113,32 @@ def generate():
         flash('Content type not found', 'error')
         return redirect(url_for('dashboard'))
 
+    # Get video format ID (default to 'short' if not provided)
+    video_format_id = request.form.get('video_format_id', type=int)
+    if not video_format_id:
+        # Default to 'short' format
+        short_format = db.get_video_format_by_slug('short')
+        if short_format:
+            video_format_id = short_format['id']
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'error': 'No video formats available'}), 400
+            flash('No video formats available', 'error')
+            return redirect(url_for('dashboard'))
+
+    # Verify video format exists
+    video_format = db.get_video_format(video_format_id)
+    if not video_format:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'Video format not found'}), 404
+        flash('Video format not found', 'error')
+        return redirect(url_for('dashboard'))
+
     # Create video record
-    video_id = db.create_video(content_type_id)
+    video_id = db.create_video(content_type_id, video_format_id)
 
     # Start generation in background thread
-    thread = threading.Thread(target=run_generation, args=(video_id, content_type_id))
+    thread = threading.Thread(target=run_generation, args=(video_id, content_type_id, video_format_id))
     thread.daemon = True
     thread.start()
     active_generations[video_id] = thread
@@ -195,7 +218,7 @@ def download_video(video_id):
 
 @app.route('/videos/<int:video_id>/regenerate', methods=['POST'])
 def regenerate(video_id):
-    """Regenerate video with same content type."""
+    """Regenerate video with same content type and format."""
     original = db.get_video(video_id)
     if not original:
         flash('Original video not found', 'error')
@@ -206,9 +229,19 @@ def regenerate(video_id):
         flash('Cannot regenerate: no content type', 'error')
         return redirect(url_for('video_detail', video_id=video_id))
 
+    # Use same format or default to short
+    video_format_id = original.get('video_format_id')
+    if not video_format_id:
+        short_format = db.get_video_format_by_slug('short')
+        video_format_id = short_format['id'] if short_format else None
+
+    if not video_format_id:
+        flash('Cannot regenerate: no video format', 'error')
+        return redirect(url_for('video_detail', video_id=video_id))
+
     # Create new video and start generation
-    new_video_id = db.create_video(content_type_id)
-    thread = threading.Thread(target=run_generation, args=(new_video_id, content_type_id))
+    new_video_id = db.create_video(content_type_id, video_format_id)
+    thread = threading.Thread(target=run_generation, args=(new_video_id, content_type_id, video_format_id))
     thread.daemon = True
     thread.start()
     active_generations[new_video_id] = thread
@@ -604,7 +637,8 @@ if __name__ == '__main__':
     # Initialize database
     db.init_db()
 
-    # Seed default content types if needed
+    # Seed default video formats and content types if needed
+    db.seed_video_formats()
     db.seed_content_types()
 
     # Ensure credentials directory exists

@@ -50,6 +50,44 @@
                 </div>
             </div>
 
+            <!-- Video Format Selector -->
+            {% if video_formats %}
+            <h5 class="mb-3 mt-4" style="font-weight: 300;">Select Format</h5>
+            <div class="row justify-content-center g-3 mb-4" id="video-formats">
+                {% for vf in video_formats %}
+                <div class="col-6 col-md-3 col-lg-2">
+                    <div class="format-card{% if loop.first %} selected{% endif %}"
+                         data-id="{{ vf.id }}"
+                         onclick="selectFormat(this, {{ vf.id }})">
+                        <div class="format-icon">
+                            {% if vf.icon == 'play-icon' %}
+                                <i class="bi bi-play-circle"></i>
+                            {% elif vf.icon == 'collection-icon' %}
+                                <i class="bi bi-collection-play"></i>
+                            {% elif vf.icon == 'film-icon' %}
+                                <i class="bi bi-film"></i>
+                            {% elif vf.icon == 'moon-icon' %}
+                                <i class="bi bi-moon-stars"></i>
+                            {% else %}
+                                <i class="bi bi-camera-video"></i>
+                            {% endif %}
+                        </div>
+                        <div class="small">{{ vf.name }}</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">
+                            {% if vf.target_duration < 60 %}
+                            ~{{ vf.target_duration }}s
+                            {% elif vf.target_duration < 3600 %}
+                            ~{{ (vf.target_duration / 60)|int }} min
+                            {% else %}
+                            ~{{ (vf.target_duration / 3600)|int }}h
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             {% if content_types %}
             <button id="generate-btn" class="btn btn-factory btn-lg">
                 <i class="bi bi-play-fill me-2"></i>Generate Video
@@ -154,6 +192,7 @@
 let currentVideoId = null;
 let pollInterval = null;
 let selectedContentType = {{ content_types[0].id if content_types else 'null' }};
+let selectedFormat = {{ video_formats[0].id if video_formats else 'null' }};
 
 function selectContentType(element, id) {
     // Remove selection from all cards
@@ -163,6 +202,16 @@ function selectContentType(element, id) {
     // Add selection to clicked card
     element.classList.add('selected');
     selectedContentType = id;
+}
+
+function selectFormat(element, id) {
+    // Remove selection from all format cards
+    document.querySelectorAll('.format-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    // Add selection to clicked card
+    element.classList.add('selected');
+    selectedFormat = id;
 }
 
 function filterVideos() {
@@ -182,6 +231,10 @@ document.getElementById('generate-btn').addEventListener('click', function() {
         alert('Please select a content type');
         return;
     }
+    if (!selectedFormat) {
+        alert('Please select a video format');
+        return;
+    }
 
     const btn = this;
     btn.disabled = true;
@@ -189,6 +242,7 @@ document.getElementById('generate-btn').addEventListener('click', function() {
 
     const formData = new FormData();
     formData.append('content_type_id', selectedContentType);
+    formData.append('video_format_id', selectedFormat);
 
     fetch('{{ url_for("generate") }}', {
         method: 'POST',
