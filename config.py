@@ -15,6 +15,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 DATABASE_PATH = os.path.join(DATA_DIR, "factory.db")
 CREDENTIALS_DIR = os.path.join(DATA_DIR, "credentials")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs/videos")
+THUMBNAIL_DIR = os.path.join(BASE_DIR, "outputs/thumbnails")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 MUSIC_DIR = os.path.join(ASSETS_DIR, "music")
 TEMP_DIR = os.path.join(BASE_DIR, "temp")
@@ -62,7 +63,7 @@ YOUTUBE_DEFAULT_TAGS = ["shorts", "viral", "fyp"]
 YOUTUBE_AUTO_PUBLISH = False  # Auto-publish after video generation
 
 # Create directories on import
-for directory in [OUTPUT_DIR, ASSETS_DIR, MUSIC_DIR, TEMP_DIR, DATA_DIR, CREDENTIALS_DIR]:
+for directory in [OUTPUT_DIR, THUMBNAIL_DIR, ASSETS_DIR, MUSIC_DIR, TEMP_DIR, DATA_DIR, CREDENTIALS_DIR]:
     os.makedirs(directory, exist_ok=True)
 
 # Create music subfolders
