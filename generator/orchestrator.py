@@ -178,6 +178,7 @@ def generate_compilation(video_id: int, content_type: dict, video_format: dict):
 
     # Step 3: Generate each scene
     scenes = []
+    first_error = None
     for i in range(scene_count):
         progress = 10 + int((i / scene_count) * 70)
         db.update_progress(video_id, progress, f"Generating scene {i+1}/{scene_count}...")
@@ -221,11 +222,15 @@ def generate_compilation(video_id: int, content_type: dict, video_format: dict):
 
         except Exception as e:
             db.set_scene_error(scene_id, str(e))
-            # Continue with other scenes
+            if first_error is None:
+                first_error = e
             continue
 
     if len(scenes) < 3:
-        raise VideoGenerationError(f"Only generated {len(scenes)} scenes, need at least 3")
+        error_msg = f"Only generated {len(scenes)} scenes, need at least 3."
+        if first_error:
+            error_msg += f" First error: {first_error}"
+        raise VideoGenerationError(error_msg)
 
     # Step 4: Generate outro
     db.update_progress(video_id, 82, "Generating outro...")
@@ -287,11 +292,15 @@ def generate_deep_dive_video(video_id: int, content_type: dict, video_format: di
 
     # Parse script into sections
     sections = outline.get('sections', [])
+    if not sections:
+        raise VideoGenerationError(f"Outline has no sections. Outline: {outline}")
+
     scene_count = len(sections)
     db.update_video(video_id, scene_count=scene_count)
 
     # Step 3: Generate images for each section
     scene_images = []
+    first_error = None
     for i, section in enumerate(sections):
         progress = 15 + int((i / len(sections)) * 50)
         db.update_progress(video_id, progress, f"Generating visuals {i+1}/{len(sections)}...")
@@ -320,10 +329,15 @@ def generate_deep_dive_video(video_id: int, content_type: dict, video_format: di
 
         except Exception as e:
             db.set_scene_error(scene_id, str(e))
+            if first_error is None:
+                first_error = e
             continue
 
     if len(scene_images) < 3:
-        raise VideoGenerationError(f"Only generated {len(scene_images)} section images, need at least 3")
+        error_msg = f"Only generated {len(scene_images)} section images, need at least 3."
+        if first_error:
+            error_msg += f" First error: {first_error}"
+        raise VideoGenerationError(error_msg)
 
     # Step 4: Generate full voiceover
     db.update_progress(video_id, 70, "Generating voiceover...")
