@@ -8,6 +8,8 @@ from flask import (
 )
 from urllib.parse import urlencode
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 import config
 import db
 from generator import generate_video, get_status, VideoGenerationError
@@ -17,6 +19,9 @@ from publisher import youtube
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+
+# Trust proxy headers (for HTTPS detection behind nginx)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Store active generation threads
 active_generations = {}
