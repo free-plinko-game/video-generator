@@ -35,6 +35,18 @@ def get_db():
 def init_db():
     """Initialize the database with the required schema."""
     with get_db() as conn:
+        # Users table for authentication
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_admin BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login_at TIMESTAMP
+            )
+        """)
+
         # YouTube accounts table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS youtube_accounts (
@@ -229,6 +241,54 @@ def _migrate_db():
                     conn.execute(f"ALTER TABLE content_types ADD COLUMN {col_name} {col_type}")
                 except sqlite3.OperationalError:
                     pass
+
+
+# ============== Users ==============
+
+def create_user(username: str, password_hash: str, is_admin: bool = False) -> int:
+    """Create a new user."""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """INSERT INTO users (username, password_hash, is_admin)
+               VALUES (?, ?, ?)""",
+            (username, password_hash, is_admin)
+        )
+        return cursor.lastrowid
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Get a user by ID."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    """Get a user by username."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE username = ?",
+            (username,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_user_last_login(user_id: int) -> None:
+    """Update user's last login timestamp."""
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE users SET last_login_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), user_id)
+        )
+
+
+def get_user_count() -> int:
+    """Get total number of users."""
+    with get_db() as conn:
+        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
 
 
 # ============== YouTube Accounts ==============

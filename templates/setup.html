@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Setup - Content Factory{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card no-hover">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-gear fs-1 text-muted"></i>
+                    <h4 class="mt-2" style="font-weight: 300; letter-spacing: 2px;">INITIAL SETUP</h4>
+                    <p class="text-muted small">Create your admin account</p>
+                </div>
+
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                        <div class="form-text">At least 6 characters</div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="confirm_password" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-factory w-100">
+                        <i class="bi bi-person-plus me-2"></i>Create Account
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -6,9 +6,10 @@ from flask import (
     Flask, render_template, request, jsonify,
     redirect, url_for, send_file, flash, session
 )
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from urllib.parse import urlencode
-
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import generate_password_hash, check_password_hash
 
 import config
 import db
@@ -18,10 +19,35 @@ from generator.music_handler import list_music_files, list_music_folders
 from publisher import youtube
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
 # Trust proxy headers (for HTTPS detection behind nginx)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# Flask-Login setup
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'info'
+
+
+class User(UserMixin):
+    """User class for Flask-Login."""
+    def __init__(self, user_data):
+        self.id = user_data['id']
+        self.username = user_data['username']
+        self.is_admin = user_data.get('is_admin', False)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user by ID for Flask-Login."""
+    user_data = db.get_user_by_id(int(user_id))
+    if user_data:
+        return User(user_data)
+    return None
+
 
 # Store active generation threads
 active_generations = {}
@@ -70,9 +96,76 @@ def run_youtube_upload(video_id: int, account_id: int, title: str, description: 
         db.set_youtube_failed(video_id)
 
 
+# ============== Authentication ==============
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page."""
+    # If no users exist, redirect to setup
+    if db.get_user_count() == 0:
+        return redirect(url_for('setup'))
+
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        user_data = db.get_user_by_username(username)
+        if user_data and check_password_hash(user_data['password_hash'], password):
+            user = User(user_data)
+            login_user(user, remember=True)
+            db.update_user_last_login(user.id)
+            flash('Welcome back!', 'success')
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('dashboard'))
+        else:
+            flash('Invalid username or password', 'error')
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Logout the current user."""
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    """Initial setup - create admin user."""
+    # Only allow if no users exist
+    if db.get_user_count() > 0:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not username or not password:
+            flash('Username and password are required', 'error')
+        elif len(password) < 6:
+            flash('Password must be at least 6 characters', 'error')
+        elif password != confirm_password:
+            flash('Passwords do not match', 'error')
+        else:
+            password_hash = generate_password_hash(password)
+            db.create_user(username, password_hash, is_admin=True)
+            flash('Admin account created! Please log in.', 'success')
+            return redirect(url_for('login'))
+
+    return render_template('setup.html')
+
+
 # ============== Dashboard ==============
 
 @app.route('/')
+@login_required
 def dashboard():
     """Dashboard with content type and format selectors and recent videos."""
     content_types = db.get_active_content_types()
@@ -87,6 +180,7 @@ def dashboard():
 
 
 @app.route('/generate', methods=['POST'])
+@login_required
 def generate():
     """Trigger new video generation for a content type."""
     # Check if API keys are configured
@@ -157,6 +251,7 @@ def generate():
 
 
 @app.route('/status/<int:video_id>')
+@login_required
 def status(video_id):
     """Return JSON with generation progress."""
     status_info = get_status(video_id)
@@ -166,6 +261,7 @@ def status(video_id):
 # ============== Videos ==============
 
 @app.route('/videos')
+@login_required
 def gallery():
     """Gallery of all generated videos."""
     videos = db.get_all_videos()
@@ -174,6 +270,7 @@ def gallery():
 
 
 @app.route('/videos/<int:video_id>')
+@login_required
 def video_detail(video_id):
     """Single video detail page."""
     video = db.get_video(video_id)
@@ -198,6 +295,7 @@ def video_detail(video_id):
 
 
 @app.route('/videos/<int:video_id>/download')
+@login_required
 def download_video(video_id):
     """Download MP4 file."""
     video = db.get_video(video_id)
@@ -238,6 +336,7 @@ def serve_thumbnail(video_id):
 
 
 @app.route('/videos/<int:video_id>/regenerate', methods=['POST'])
+@login_required
 def regenerate(video_id):
     """Regenerate video with same content type and format."""
     original = db.get_video(video_id)
@@ -272,6 +371,7 @@ def regenerate(video_id):
 
 
 @app.route('/videos/<int:video_id>/publish', methods=['POST'])
+@login_required
 def publish_to_youtube(video_id):
     """Publish video to YouTube."""
     # Get account ID
@@ -330,6 +430,7 @@ def publish_to_youtube(video_id):
 # ============== Content Types ==============
 
 @app.route('/content-types')
+@login_required
 def content_types_list():
     """List all content types."""
     content_types = db.get_all_content_types()
@@ -337,6 +438,7 @@ def content_types_list():
 
 
 @app.route('/content-types/new', methods=['GET', 'POST'])
+@login_required
 def content_type_new():
     """Create a new content type."""
     if request.method == 'POST':
@@ -369,6 +471,7 @@ def content_type_new():
 
 
 @app.route('/content-types/<int:content_type_id>/edit', methods=['GET', 'POST'])
+@login_required
 def content_type_edit(content_type_id):
     """Edit an existing content type."""
     content_type = db.get_content_type(content_type_id)
@@ -407,6 +510,7 @@ def content_type_edit(content_type_id):
 
 
 @app.route('/content-types/<int:content_type_id>/toggle', methods=['POST'])
+@login_required
 def content_type_toggle(content_type_id):
     """Toggle content type active status."""
     new_status = db.toggle_content_type(content_type_id)
@@ -416,6 +520,7 @@ def content_type_toggle(content_type_id):
 
 
 @app.route('/content-types/<int:content_type_id>/delete', methods=['POST'])
+@login_required
 def content_type_delete(content_type_id):
     """Delete a content type."""
     if db.delete_content_type(content_type_id):
@@ -428,6 +533,7 @@ def content_type_delete(content_type_id):
 # ============== YouTube Accounts ==============
 
 @app.route('/accounts')
+@login_required
 def accounts_list():
     """List all YouTube accounts."""
     accounts = db.get_all_youtube_accounts()
@@ -439,6 +545,7 @@ def accounts_list():
 
 
 @app.route('/accounts/<int:account_id>/default', methods=['POST'])
+@login_required
 def account_set_default(account_id):
     """Set an account as default."""
     db.set_default_youtube_account(account_id)
@@ -447,6 +554,7 @@ def account_set_default(account_id):
 
 
 @app.route('/accounts/<int:account_id>/delete', methods=['POST'])
+@login_required
 def account_delete(account_id):
     """Delete a YouTube account."""
     if db.delete_youtube_account(account_id):
@@ -459,6 +567,7 @@ def account_delete(account_id):
 # ============== YouTube OAuth ==============
 
 @app.route('/youtube/auth')
+@login_required
 def youtube_auth():
     """Initiate YouTube OAuth flow."""
     if not os.path.exists(config.GOOGLE_CLIENT_SECRETS_FILE):
@@ -526,6 +635,7 @@ def youtube_callback():
 
 
 @app.route('/youtube/disconnect', methods=['POST'])
+@login_required
 def youtube_disconnect():
     """Disconnect all YouTube accounts (legacy route)."""
     # Redirect to accounts page for proper management
@@ -535,6 +645,7 @@ def youtube_disconnect():
 # ============== Settings ==============
 
 @app.route('/settings', methods=['GET', 'POST'])
+@login_required
 def settings():
     """API keys and preferences settings."""
     if request.method == 'POST':
@@ -593,6 +704,7 @@ DEFAULT_VOICE={config.DEFAULT_VOICE}
 # ============== API Endpoints ==============
 
 @app.route('/api/videos')
+@login_required
 def api_videos():
     """API endpoint to get all videos as JSON."""
     videos = db.get_all_videos()
@@ -600,6 +712,7 @@ def api_videos():
 
 
 @app.route('/api/videos/<int:video_id>')
+@login_required
 def api_video(video_id):
     """API endpoint to get a single video as JSON."""
     video = db.get_video(video_id)
@@ -609,6 +722,7 @@ def api_video(video_id):
 
 
 @app.route('/api/content-types')
+@login_required
 def api_content_types():
     """API endpoint to get all content types as JSON."""
     content_types = db.get_all_content_types()
@@ -616,6 +730,7 @@ def api_content_types():
 
 
 @app.route('/api/youtube/status')
+@login_required
 def youtube_status():
     """Return YouTube auth status as JSON."""
     accounts = db.get_all_youtube_accounts()
