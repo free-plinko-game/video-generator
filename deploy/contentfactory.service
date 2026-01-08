@@ -1,0 +1,20 @@
+[Unit]
+Description=Content Factory Video Generator
+After=network.target
+
+[Service]
+User=contentfactory
+Group=contentfactory
+WorkingDirectory=/var/www/contentfactory
+Environment="PATH=/var/www/contentfactory/venv/bin"
+EnvironmentFile=/var/www/contentfactory/.env
+ExecStart=/var/www/contentfactory/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 --timeout 300 app:app
+Restart=always
+RestartSec=5
+
+# Allow longer timeouts for video generation
+TimeoutStartSec=60
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
