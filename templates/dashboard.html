@@ -135,16 +135,10 @@
     <div class="col-6 col-md-4 col-lg-3 video-card" data-type="{{ video.content_type_id }}">
         <a href="{{ url_for('video_detail', video_id=video.id) }}" class="text-decoration-none">
             <div class="card h-100">
-                {% if video.image_path %}
-                <img src="{{ url_for('static', filename='thumbnails/' ~ video.id ~ '.png') }}"
+                <img src="{{ url_for('serve_thumbnail', video_id=video.id) }}"
                      class="card-img-top video-thumbnail"
                      alt="Video {{ video.id }}"
                      onerror="this.parentElement.innerHTML='<div class=\'video-thumbnail-placeholder\'><i class=\'bi bi-film fs-1 text-muted\'></i></div>'">
-                {% else %}
-                <div class="video-thumbnail-placeholder">
-                    <i class="bi bi-film fs-1 text-muted"></i>
-                </div>
-                {% endif %}
                 <div class="card-body">
                     <p class="card-text small mb-1">
                         {% if video.content_type_icon == 'moon-icon' %}

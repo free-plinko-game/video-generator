@@ -221,6 +221,22 @@ def download_video(video_id):
     )
 
 
+@app.route('/thumbnails/<int:video_id>.png')
+def serve_thumbnail(video_id):
+    """Serve video thumbnail."""
+    thumbnail_path = os.path.join(config.THUMBNAIL_DIR, f"thumb_{video_id}.png")
+    if os.path.exists(thumbnail_path):
+        return send_file(thumbnail_path, mimetype='image/png')
+
+    # Fallback: try to use the video's image_path (first scene image)
+    video = db.get_video(video_id)
+    if video and video.get('image_path') and os.path.exists(video['image_path']):
+        return send_file(video['image_path'], mimetype='image/png')
+
+    # Return 404 - let the onerror handler show placeholder
+    return '', 404
+
+
 @app.route('/videos/<int:video_id>/regenerate', methods=['POST'])
 def regenerate(video_id):
     """Regenerate video with same content type and format."""
