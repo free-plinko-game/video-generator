@@ -74,10 +74,10 @@ def create_text_overlay(text: str, duration: float, video_size: tuple):
     Returns:
         TextClip with fade in effect
     """
-    # Use cross-platform font (DejaVu Sans works on Linux, fallback to Arial for Mac/Windows)
-    import shutil
-    if shutil.which('fc-list'):  # Linux
-        font = 'DejaVu-Sans'
+    # Use cross-platform font - full path for Linux, name for Mac/Windows
+    import platform
+    if platform.system() == 'Linux':
+        font = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
     else:
         font = 'Arial'
 
